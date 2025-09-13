@@ -2,17 +2,19 @@ const User = require("../models/User");
 const jwt = require("jsonwebtoken");
 
 // helper function to create token
-const createToken = (userId) => {
-    return jwt.sign({ id: userId }, process.env.JWT_SECRET, {
-        expiresIn: "7d", // token valid for 7 days
-    });
+const createToken = (userId, role) => {
+    return jwt.sign(
+        { id: userId, role },
+        process.env.JWT_SECRET,
+        { expiresIn: "7d" } // token valid for 7 days
+    );
 };
 
-// @desc Register new user
+// @desc Register a new user
 // @route POST /api/auth/register
 exports.register = async (req, res) => {
     try {
-        const { name, email, password } = req.body;
+        const { name, email, password, role } = req.body;
 
         // check if user already exists
         const existingUser = await User.findOne({ email });
@@ -21,11 +23,16 @@ exports.register = async (req, res) => {
         }
 
         // create user
-        const user = new User({ name, email, password });
+        const user = new User({
+            name,
+            email,
+            password,
+            role: role || "user" // default user if not provided
+        });
         await user.save();
 
         // generate token
-        const token = createToken(user._id);
+        const token = createToken(user._id, user.role);
 
         res.status(201).json({
             message: "User registered successfully",
@@ -33,8 +40,9 @@ exports.register = async (req, res) => {
                 id: user._id,
                 name: user.name,
                 email: user.email,
+                role: user.role
             },
-            token,
+            token
         });
     } catch (err) {
         console.error(err);
@@ -48,7 +56,7 @@ exports.login = async (req, res) => {
     try {
         const { email, password } = req.body;
 
-        // check if user exists
+        // find user and include password field
         const user = await User.findOne({ email }).select("+password");
         if (!user) {
             return res.status(400).json({ message: "Invalid email or password" });
@@ -61,7 +69,7 @@ exports.login = async (req, res) => {
         }
 
         // generate token
-        const token = createToken(user._id);
+        const token = createToken(user._id, user.role);
 
         res.status(200).json({
             message: "Login successful",
@@ -69,8 +77,9 @@ exports.login = async (req, res) => {
                 id: user._id,
                 name: user.name,
                 email: user.email,
+                role: user.role
             },
-            token,
+            token
         });
     } catch (err) {
         console.error(err);
