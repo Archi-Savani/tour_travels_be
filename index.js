@@ -1,8 +1,10 @@
-import express from "express";
-import mongoose from "mongoose";
-import cors from "cors";
-import userRoutes from "./routers/User.js";
-import dotenv from "dotenv";
+const express = require("express");
+const mongoose = require("mongoose");
+const cors = require("cors");
+const dotenv = require("dotenv");
+
+const userRoutes = require("./routers/User");
+const stateRoutes = require("./routers/State");
 
 dotenv.config();
 
@@ -14,6 +16,7 @@ app.use(express.urlencoded({ extended: true }));
 
 // Routes
 app.use("/api/user", userRoutes);
+app.use("/api/state", stateRoutes);
 
 const connectDB = async () => {
     try {
@@ -24,7 +27,7 @@ const connectDB = async () => {
         process.exit(1);
     }
 };
-//,loko,o
+
 const PORT = process.env.PORT || 5000;
 
 connectDB().then(() => {
