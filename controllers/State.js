@@ -7,17 +7,14 @@ exports.createState = async (req, res) => {
     try {
         const { name, description } = req.body;
 
-        if (!req.file) {
+        if (!req.imageUrl) {
             return res.status(400).json({ message: "Image file is required" });
         }
-
-        // upload image to cloudinary
-        const imageUrl = await uploadFile(req.file.buffer);
 
         const state = new State({
             name,
             description,
-            image: imageUrl
+            image: req.imageUrl
         });
 
         await state.save();
@@ -67,9 +64,8 @@ exports.updateState = async (req, res) => {
         let updateData = { name, description };
 
         // if a new image is uploaded
-        if (req.file) {
-            const imageUrl = await uploadFile(req.file.buffer);
-            updateData.image = imageUrl;
+        if (req.imageUrl) {
+            updateData.image = req.imageUrl;
         }
 
         const state = await State.findByIdAndUpdate(req.params.id, updateData, {
