@@ -28,81 +28,81 @@ const parseComplexFields = (fields) => {
 /**
  * @desc Create a new tour
  */
-const createTour = async (req, res) => {
-    try {
-        const {
-            state,
-            title,
-            description,
-            difficulty,
-            duration,
-            altitude,
-            pickupPoints,
-            baseCamp,
-            minimumAge,
-            bestTimeToVisit,
-            availableDates,
-            price,
-            summary,
-            location,
-            discount,
-        } = req.body;
-
-        // Parse JSON strings for complex fields
-        let parsedFields = {};
+    const createTour = async (req, res) => {
         try {
-            parsedFields = parseComplexFields(req.body);
-        } catch (parseError) {
-            return res.status(400).json({ 
-                message: "Invalid JSON format for complex fields", 
-                error: parseError.message 
+            const {
+                state,
+                title,
+                description,
+                difficulty,
+                duration,
+                altitude,
+                pickupPoints,
+                baseCamp,
+                minimumAge,
+                bestTimeToVisit,
+                availableDates,
+                price,
+                summary,
+                location,
+                discount,
+            } = req.body;
+
+            // Parse JSON strings for complex fields
+            let parsedFields = {};
+            try {
+                parsedFields = parseComplexFields(req.body);
+            } catch (parseError) {
+                return res.status(400).json({
+                    message: "Invalid JSON format for complex fields",
+                    error: parseError.message
+                });
+            }
+
+            let imageUrls = [];
+            if (req.imageUrls && req.imageUrls.length > 0) {
+                imageUrls = req.imageUrls;
+            }
+
+            // auto-calculate discountedPrice
+            let discountedPrice = price;
+            if (discount && discount > 0) {
+                discountedPrice = price - (price * discount) / 100;
+            }
+
+            const newTour = new Tour({
+                state,
+                title,
+                description,
+                difficulty,
+                duration,
+                altitude,
+                pickupPoints,
+                baseCamp,
+                minimumAge,
+                bestTimeToVisit,
+                packages: parsedFields.packages || [],
+                availableDates,
+                sharingTypes: parsedFields.sharingTypes || [],
+                images: imageUrls,
+                price,
+                schedule: parsedFields.schedule || [],
+                summary,
+                placesToBeVisited: parsedFields.placesToBeVisited || [],
+                recommended: parsedFields.recommended || [],
+                location,
+                trackActivity: parsedFields.trackActivity || [],
+                gallery: parsedFields.gallery || [],
+                discount,
+                discountedPrice,
             });
+
+            const savedTour = await newTour.save();
+            res.status(201).json(savedTour);
+        } catch (error) {
+            res.status(500).json({ message: "Error creating tour", error: error.message });
         }
-
-        let imageUrls = [];
-        if (req.imageUrls && req.imageUrls.length > 0) {
-            imageUrls = req.imageUrls;
-        }
-
-        // auto-calculate discountedPrice
-        let discountedPrice = price;
-        if (discount && discount > 0) {
-            discountedPrice = price - (price * discount) / 100;
-        }
-
-        const newTour = new Tour({
-            state,
-            title,
-            description,
-            difficulty,
-            duration,
-            altitude,
-            pickupPoints,
-            baseCamp,
-            minimumAge,
-            bestTimeToVisit,
-            packages: parsedFields.packages || [],
-            availableDates,
-            sharingTypes: parsedFields.sharingTypes || [],
-            images: imageUrls,
-            price,
-            schedule: parsedFields.schedule || [],
-            summary,
-            placesToBeVisited: parsedFields.placesToBeVisited || [],
-            recommended: parsedFields.recommended || [],
-            location,
-            trackActivity: parsedFields.trackActivity || [],
-            gallery: parsedFields.gallery || [],
-            discount,
-            discountedPrice,
-        });
-
-        const savedTour = await newTour.save();
-        res.status(201).json(savedTour);
-    } catch (error) {
-        res.status(500).json({ message: "Error creating tour", error: error.message });
-    }
-};
+    };
 
 /**
  * @desc Get all tours
