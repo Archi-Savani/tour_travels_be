@@ -37,4 +37,19 @@ const uploadFile = async (fileBuffer) => {
     }
 };
 
-module.exports = { uploadFile };
+// Middleware function to handle single image upload
+const uploadSingleImage = async (req, res, next) => {
+    try {
+        if (!req.file) {
+            return next();
+        }
+
+        const imageUrl = await uploadFile(req.file.buffer);
+        req.imageUrl = imageUrl;
+        next();
+    } catch (error) {
+        res.status(500).json({ message: "Error uploading image", error: error.message });
+    }
+};
+
+module.exports = { uploadFile, uploadSingleImage };
