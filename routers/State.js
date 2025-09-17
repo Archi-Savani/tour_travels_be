@@ -1,20 +1,22 @@
 const express = require("express");
+const auth = require("../middleware/auth");
+const { uploadSingleImage } = require("../middleware/multer");
+const { uploadSingleImage: uploadToCloudinary } = require("../utils/upload");
 const {
     createState,
     getStates,
     getStateById,
     updateState,
-    deleteState
+    deleteState,
 } = require("../controllers/State");
-const upload = require("../middleware/multer");
-const auth = require("../middleware/auth");
 
 const router = express.Router();
 
-router.post("/", auth, upload.single("image"), createState);
+// Single image upload
+router.post("/", auth, uploadSingleImage, uploadToCloudinary, createState);
 router.get("/", getStates);
 router.get("/:id", getStateById);
-router.put("/:id", auth, upload.single("image"), updateState);
+router.put("/:id", auth, uploadSingleImage, uploadToCloudinary, updateState);
 router.delete("/:id", auth, deleteState);
 
 module.exports = router;
