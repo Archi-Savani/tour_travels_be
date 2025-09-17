@@ -5,6 +5,7 @@ const dotenv = require("dotenv");
 
 const userRoutes = require("./routers/User");
 const stateRoutes = require("./routers/State");
+const tourRoutes = require("./routers/Tour");
 
 dotenv.config();
 
@@ -17,6 +18,7 @@ app.use(express.urlencoded({ extended: true }));
 // Routes
 app.use("/api/user", userRoutes);
 app.use("/api/state", stateRoutes);
+app.use("/api/tour", tourRoutes);
 
 const connectDB = async () => {
     try {
