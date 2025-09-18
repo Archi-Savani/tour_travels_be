@@ -205,10 +205,35 @@ const deleteTour = async (req, res) => {
     }
 };
 
+/**
+ * @desc Get upcoming and popular tours
+ * @route GET /tours/highlights
+ */
+const getTourHighlights = async (req, res) => {
+    try {
+        const now = new Date();
+
+        // Upcoming: availableDates in the future, soonest first
+        const upcoming = await Tour.find({ availableDates: { $gte: now } })
+            .populate("state")
+            .sort({ availableDates: 1, createdAt: -1 });
+
+        // Popular: highest discount first, then most recent
+        const popular = await Tour.find({})
+            .populate("state")
+            .sort({ discount: -1, createdAt: -1 });
+
+        return res.status(200).json({ upcoming, popular });
+    } catch (error) {
+        return res.status(500).json({ message: "Error fetching tour highlights", error: error.message });
+    }
+};
+
 module.exports = {
     createTour,
     getTours,
     getTourById,
     updateTour,
-    deleteTour,
+	deleteTour,
+	getTourHighlights,
 };
