@@ -8,6 +8,7 @@ const {
     getTourById,
     updateTour,
     deleteTour,
+    getTourHighlights,
 } = require("../controllers/Tour");
 
 const router = express.Router();
@@ -15,6 +16,7 @@ const router = express.Router();
 // Multiple image upload
 router.post("/", auth, uploadMultipleImages, uploadToCloudinary, createTour);
 router.get("/", getTours);
+router.get("/highlights", getTourHighlights);
 router.get("/:id", getTourById);
 router.put("/:id", auth, uploadMultipleImages, uploadToCloudinary, updateTour);
 router.delete("/:id", auth, deleteTour);
