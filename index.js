@@ -7,6 +7,7 @@ const userRoutes = require("./routers/User");
 const stateRoutes = require("./routers/State");
 const tourRoutes = require("./routers/Tour");
 const inquiryRoutes = require("./routers/Inquiry");
+const hotelRoomRoutes = require("./routers/HotelRoom");
 
 dotenv.config();
 
@@ -21,6 +22,7 @@ app.use("/api/user", userRoutes);
 app.use("/api/state", stateRoutes);
 app.use("/api/tour", tourRoutes);
 app.use("/api/inquiry", inquiryRoutes);
+app.use("/api/hotelRoom", hotelRoomRoutes);
 
 const connectDB = async () => {
     try {
