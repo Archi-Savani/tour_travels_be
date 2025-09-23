@@ -45,9 +45,11 @@ const tourSchema = new mongoose.Schema(
                 price: { type: Number },
             },
         ],
-        availableDates: {
-            type: Date,
-        },
+        availableDates: [
+            {
+                type: Date,
+            }
+        ],
         sharingTypes: [
             {
                 type: {

@@ -2,107 +2,157 @@
 const Tour = require("../models/Tour");
 const { uploadMultipleFiles } = require("../utils/uploadMultipleFiles");
 
-// Helper function to parse JSON strings for complex fields
+// Helper function to parse JSON strings or nested fields (like gallery[0][title])
 const parseComplexFields = (fields) => {
     const parsedFields = {};
-    const fieldNames = ['packages', 'sharingTypes', 'schedule', 'placesToBeVisited', 'recommended', 'trackActivity', 'gallery'];
-    
-    fieldNames.forEach(fieldName => {
+    const jsonFieldNames = [
+        "packages",
+        "sharingTypes",
+        "schedule",
+        "placesToBeVisited",
+        "recommended",
+        "trackActivity",
+    ];
+
+    // Handle JSON string fields (when passed as stringified JSON)
+    jsonFieldNames.forEach((fieldName) => {
         const fieldValue = fields[fieldName];
         if (fieldValue) {
-            if (typeof fieldValue === 'string') {
+            if (typeof fieldValue === "string") {
                 try {
                     parsedFields[fieldName] = JSON.parse(fieldValue);
                 } catch (error) {
-                    throw new Error(`Invalid JSON format for ${fieldName}: ${error.message}`);
+                    throw new Error(
+                        `Invalid JSON format for ${fieldName}: ${error.message}`
+                    );
                 }
             } else if (Array.isArray(fieldValue)) {
                 parsedFields[fieldName] = fieldValue;
             }
         }
     });
-    
+
+    // Handle nested fields for gallery like gallery[0][title], gallery[0][image]
+    const gallery = [];
+    Object.keys(fields).forEach((key) => {
+        const match = key.match(/^gallery\[(\d+)\]\[(\w+)\]$/); // e.g. gallery[0][title]
+        if (match) {
+            const index = parseInt(match[1], 10);
+            const subField = match[2];
+
+            if (!gallery[index]) gallery[index] = {};
+            gallery[index][subField] = fields[key];
+        }
+    });
+
+    if (gallery.length > 0) {
+        parsedFields.gallery = gallery;
+    }
+
     return parsedFields;
 };
 
 /**
  * @desc Create a new tour
  */
-    const createTour = async (req, res) => {
+/**
+ * @desc Create a new tour
+ */
+const createTour = async (req, res) => {
+    try {
+        const {
+            state,
+            title,
+            description,
+            difficulty,
+            duration,
+            altitude,
+            pickupPoints,
+            baseCamp,
+            minimumAge,
+            bestTimeToVisit,
+            availableDates, // now array
+            price,
+            summary,
+            location,
+            discount,
+        } = req.body;
+
+        // Parse JSON strings and nested fields
+        let parsedFields = {};
         try {
-            const {
-                state,
-                title,
-                description,
-                difficulty,
-                duration,
-                altitude,
-                pickupPoints,
-                baseCamp,
-                minimumAge,
-                bestTimeToVisit,
-                availableDates,
-                price,
-                summary,
-                location,
-                discount,
-            } = req.body;
-
-            // Parse JSON strings for complex fields
-            let parsedFields = {};
-            try {
-                parsedFields = parseComplexFields(req.body);
-            } catch (parseError) {
-                return res.status(400).json({
-                    message: "Invalid JSON format for complex fields",
-                    error: parseError.message
-                });
-            }
-
-            let imageUrls = [];
-            if (req.imageUrls && req.imageUrls.length > 0) {
-                imageUrls = req.imageUrls;
-            }
-
-            // auto-calculate discountedPrice
-            let discountedPrice = price;
-            if (discount && discount > 0) {
-                discountedPrice = price - (price * discount) / 100;
-            }
-
-            const newTour = new Tour({
-                state,
-                title,
-                description,
-                difficulty,
-                duration,
-                altitude,
-                pickupPoints,
-                baseCamp,
-                minimumAge,
-                bestTimeToVisit,
-                packages: parsedFields.packages || [],
-                availableDates,
-                sharingTypes: parsedFields.sharingTypes || [],
-                images: imageUrls,
-                price,
-                schedule: parsedFields.schedule || [],
-                summary,
-                placesToBeVisited: parsedFields.placesToBeVisited || [],
-                recommended: parsedFields.recommended || [],
-                location,
-                trackActivity: parsedFields.trackActivity || [],
-                gallery: parsedFields.gallery || [],
-                discount,
-                discountedPrice,
+            parsedFields = parseComplexFields(req.body);
+        } catch (parseError) {
+            return res.status(400).json({
+                message: "Invalid JSON format for complex fields",
+                error: parseError.message,
             });
-
-            const savedTour = await newTour.save();
-            res.status(201).json(savedTour);
-        } catch (error) {
-            res.status(500).json({ message: "Error creating tour", error: error.message });
         }
-    };
+
+        let imageUrls = [];
+        if (req.imageUrls && req.imageUrls.length > 0) {
+            imageUrls = req.imageUrls;
+        }
+
+        // auto-calculate discountedPrice
+        let discountedPrice = price;
+        if (discount && discount > 0) {
+            discountedPrice = price - (price * discount) / 100;
+        }
+
+        // ✅ Ensure availableDates is always an array of Date objects
+        let parsedAvailableDates = [];
+        if (availableDates) {
+            if (typeof availableDates === "string") {
+                try {
+                    parsedAvailableDates = JSON.parse(availableDates).map(
+                        (d) => new Date(d)
+                    );
+                } catch (err) {
+                    return res.status(400).json({
+                        message: "Invalid format for availableDates. Send as array or JSON string.",
+                    });
+                }
+            } else if (Array.isArray(availableDates)) {
+                parsedAvailableDates = availableDates.map((d) => new Date(d));
+            } else {
+                parsedAvailableDates = [new Date(availableDates)];
+            }
+        }
+
+        const newTour = new Tour({
+            state,
+            title,
+            description,
+            difficulty,
+            duration,
+            altitude,
+            pickupPoints,
+            baseCamp,
+            minimumAge,
+            bestTimeToVisit,
+            packages: parsedFields.packages || [],
+            availableDates: parsedAvailableDates, // ✅ fixed
+            sharingTypes: parsedFields.sharingTypes || [],
+            images: imageUrls,
+            price,
+            schedule: parsedFields.schedule || [],
+            summary,
+            placesToBeVisited: parsedFields.placesToBeVisited || [],
+            recommended: parsedFields.recommended || [],
+            location,
+            trackActivity: parsedFields.trackActivity || [],
+            gallery: parsedFields.gallery || [],
+            discount,
+            discountedPrice,
+        });
+
+        const savedTour = await newTour.save();
+        res.status(201).json(savedTour);
+    } catch (error) {
+        res.status(500).json({ message: "Error creating tour", error: error.message });
+    }
+};
 
 /**
  * @desc Get all tours
@@ -112,7 +162,9 @@ const getTours = async (req, res) => {
         const tours = await Tour.find().populate("state");
         res.status(200).json(tours);
     } catch (error) {
-        res.status(500).json({ message: "Error fetching tours", error: error.message });
+        res
+            .status(500)
+            .json({ message: "Error fetching tours", error: error.message });
     }
 };
 
@@ -127,7 +179,9 @@ const getTourById = async (req, res) => {
         }
         res.status(200).json(tour);
     } catch (error) {
-        res.status(500).json({ message: "Error fetching tour", error: error.message });
+        res
+            .status(500)
+            .json({ message: "Error fetching tour", error: error.message });
     }
 };
 
@@ -143,14 +197,14 @@ const updateTour = async (req, res) => {
             imageUrls = req.imageUrls;
         }
 
-        // Parse JSON strings for complex fields
+        // Parse JSON strings and nested fields
         let parsedFields = {};
         try {
             parsedFields = parseComplexFields(req.body);
         } catch (parseError) {
-            return res.status(400).json({ 
-                message: "Invalid JSON format for complex fields", 
-                error: parseError.message 
+            return res.status(400).json({
+                message: "Invalid JSON format for complex fields",
+                error: parseError.message,
             });
         }
 
@@ -168,7 +222,7 @@ const updateTour = async (req, res) => {
         };
 
         // Replace complex fields with parsed versions if they exist
-        Object.keys(parsedFields).forEach(key => {
+        Object.keys(parsedFields).forEach((key) => {
             if (parsedFields[key] && parsedFields[key].length > 0) {
                 updateData[key] = parsedFields[key];
             }
@@ -186,7 +240,9 @@ const updateTour = async (req, res) => {
 
         res.status(200).json(updatedTour);
     } catch (error) {
-        res.status(500).json({ message: "Error updating tour", error: error.message });
+        res
+            .status(500)
+            .json({ message: "Error updating tour", error: error.message });
     }
 };
 
@@ -201,7 +257,9 @@ const deleteTour = async (req, res) => {
         }
         res.status(200).json({ message: "Tour deleted successfully" });
     } catch (error) {
-        res.status(500).json({ message: "Error deleting tour", error: error.message });
+        res
+            .status(500)
+            .json({ message: "Error deleting tour", error: error.message });
     }
 };
 
@@ -225,7 +283,10 @@ const getTourHighlights = async (req, res) => {
 
         return res.status(200).json({ upcoming, popular });
     } catch (error) {
-        return res.status(500).json({ message: "Error fetching tour highlights", error: error.message });
+        return res.status(500).json({
+            message: "Error fetching tour highlights",
+            error: error.message,
+        });
     }
 };
 
@@ -234,6 +295,6 @@ module.exports = {
     getTours,
     getTourById,
     updateTour,
-	deleteTour,
-	getTourHighlights,
+    deleteTour,
+    getTourHighlights,
 };
