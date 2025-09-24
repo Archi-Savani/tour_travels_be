@@ -1,8 +1,10 @@
 const TaxiTour = require("../models/TaxiTour");
+const { uploadToCloudinary } = require("../utils/upload");
 
 // ================= Create Taxi Tour =================
 const createTaxiTour = async (req, res) => {
     try {
+        // Multer puts text fields in req.body
         const {
             serviceType,
             routeType,
@@ -14,12 +16,15 @@ const createTaxiTour = async (req, res) => {
             discount,
         } = req.body;
 
-        if (!req.imageUrl) {
-            return res.status(400).json({
-                success: false,
-                message: "Image is required",
-            });
+        // pick image from either 'image' or 'taxiImage' fields
+        const fileFromFields = Array.isArray(req.files?.image) ? req.files.image[0] : Array.isArray(req.files?.taxiImage) ? req.files.taxiImage[0] : null;
+        const uploadSource = req.file || fileFromFields;
+        if (!uploadSource) {
+            return res.status(400).json({ success: false, message: "Image is required (image or taxiImage)" });
         }
+
+        // Upload image buffer to Cloudinary
+        const imageUrl = await uploadToCloudinary(uploadSource.buffer);
 
         const taxiTour = await TaxiTour.create({
             serviceType,
@@ -30,7 +35,7 @@ const createTaxiTour = async (req, res) => {
             taxiType,
             price,
             discount,
-            image: req.imageUrl,
+            taxiImage: imageUrl,
         });
 
         res.status(201).json({
@@ -46,6 +51,8 @@ const createTaxiTour = async (req, res) => {
         });
     }
 };
+
+
 
 // ================= Get All Taxi Tours =================
 const getTaxiTours = async (req, res) => {
@@ -94,16 +101,16 @@ const updateTaxiTour = async (req, res) => {
     try {
         const taxiTour = await TaxiTour.findById(req.params.id);
         if (!taxiTour) {
-            return res.status(404).json({
-                success: false,
-                message: "Taxi tour not found",
-            });
+            return res.status(404).json({ success: false, message: "Taxi tour not found" });
         }
 
         const updates = { ...req.body };
 
-        if (req.imageUrl) {
-            updates.image = req.imageUrl; // replace image if new one uploaded
+        // Check for uploaded image
+        const fileFromFields = Array.isArray(req.files?.image) ? req.files.image[0] : Array.isArray(req.files?.taxiImage) ? req.files.taxiImage[0] : null;
+        const uploadSource = req.file || fileFromFields;
+        if (uploadSource) {
+            updates.taxiImage = await uploadToCloudinary(uploadSource.buffer);
         }
 
         Object.assign(taxiTour, updates);

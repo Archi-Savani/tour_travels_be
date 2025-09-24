@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
 
-const { uploadSingleImage } = require("../utils/upload");
+const { uploadTaxiImage } = require("../middleware/multer");
 const {
     createTaxiTour,
     getTaxiTours,
@@ -15,7 +15,7 @@ const auth  = require("../middleware/auth"); // 🔒 Auth middleware
 // ================= Routes =================
 
 // Create Taxi Tour (Protected, with image upload)
-router.post("/", auth, uploadSingleImage, createTaxiTour);
+router.post("/", auth, uploadTaxiImage, createTaxiTour);
 
 // Get all Taxi Tours (Public)
 router.get("/", getTaxiTours);
@@ -24,7 +24,7 @@ router.get("/", getTaxiTours);
 router.get("/:id", getTaxiTourById);
 
 // Update Taxi Tour (Protected, with optional image update)
-router.put("/:id", auth, uploadSingleImage, updateTaxiTour);
+router.put("/:id", auth, uploadTaxiImage, updateTaxiTour);
 
 // Delete Taxi Tour (Protected)
 router.delete("/:id", auth, deleteTaxiTour);

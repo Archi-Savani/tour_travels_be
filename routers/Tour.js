@@ -1,7 +1,6 @@
+// routes/tourRoutes.js
 const express = require("express");
-const auth = require("../middleware/auth");
-const { uploadMultipleImages } = require("../middleware/multer");
-const { uploadMultipleImages: uploadToCloudinary } = require("../utils/uploadMultipleFiles");
+const router = express.Router();
 const {
     createTour,
     getTours,
@@ -11,14 +10,26 @@ const {
     getTourHighlights,
 } = require("../controllers/Tour");
 
-const router = express.Router();
+const { uploadTourFiles } = require("../middleware/multer");
 
-// Multiple image upload
-router.post("/", auth, uploadMultipleImages, uploadToCloudinary, createTour);
+// -------------------- TOUR ROUTES --------------------
+
+// Create a new tour
+router.post("/", uploadTourFiles, createTour);
+
+// Get all tours
 router.get("/", getTours);
-router.get("/highlights", getTourHighlights);
+
+// Get a single tour by ID
 router.get("/:id", getTourById);
-router.put("/:id", auth, uploadMultipleImages, uploadToCloudinary, updateTour);
-router.delete("/:id", auth, deleteTour);
+
+// Update a tour
+router.put("/:id", uploadTourFiles, updateTour);
+
+// Delete a tour
+router.delete("/:id", deleteTour);
+
+// Get upcoming and popular tours
+router.get("/highlights", getTourHighlights);
 
 module.exports = router;

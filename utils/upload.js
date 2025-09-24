@@ -52,4 +52,24 @@ const uploadSingleImage = async (req, res, next) => {
     }
 };
 
-module.exports = { uploadFile, uploadSingleImage };
+const uploadToCloudinary = (buffer) => {
+    return new Promise((resolve, reject) => {
+        cloudinary.uploader
+            .upload_stream({ folder: "tours" }, (error, result) => {
+                if (error) return reject(error);
+                resolve(result.secure_url);
+            })
+            .end(buffer);
+    });
+};
+
+const uploadFilesToCloudinary = async (files) => {
+    const urls = [];
+    for (const file of files) {
+        const url = await uploadToCloudinary(file);
+        urls.push(url);
+    }
+    return urls;
+};
+
+module.exports = { uploadFile, uploadSingleImage, uploadToCloudinary, uploadFilesToCloudinary };

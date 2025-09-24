@@ -9,15 +9,20 @@ const fileFilter = (req, file, cb) => {
     else cb(new Error("Only image files are allowed"), false);
 };
 
-// Base multer config
 const upload = multer({
     storage,
     fileFilter,
     limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
 });
 
-// Export two middlewares
+// ✅ Middlewares
 module.exports = {
-    uploadSingleImage: upload.single("image"),    // For State
-    uploadMultipleImages: upload.array("images", 10), // For Tour
+    uploadSingleImage: upload.single("image"), // For State model
+    uploadMultipleImages: upload.array("images", 10), // For Tour model
+    uploadTourFiles: upload.any(), // Accept any fields including gallery[0][image], gallery[1][image]...
+    // Accept both 'image' and 'taxiImage' field names for TaxiTour
+    uploadTaxiImage: upload.fields([
+        { name: "image", maxCount: 1 },
+        { name: "taxiImage", maxCount: 1 },
+    ]),
 };

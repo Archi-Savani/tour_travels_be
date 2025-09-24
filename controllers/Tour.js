@@ -1,300 +1,215 @@
 // controllers/tourController.js
 const Tour = require("../models/Tour");
-const { uploadMultipleFiles } = require("../utils/uploadMultipleFiles");
+const { uploadToCloudinary } = require("../utils/upload");
 
-// Helper function to parse JSON strings or nested fields (like gallery[0][title])
-const parseComplexFields = (fields) => {
+// Helper to parse JSON fields and gallery
+const parseComplexFields = (fields, uploadedGalleryImages) => {
     const parsedFields = {};
-    const jsonFieldNames = [
-        "packages",
-        "sharingTypes",
-        "schedule",
-        "placesToBeVisited",
-        "recommended",
-        "trackActivity",
-    ];
+    const jsonFields = ["packages","sharingTypes","schedule","placesToBeVisited","recommended","trackActivity"];
 
-    // Handle JSON string fields (when passed as stringified JSON)
-    jsonFieldNames.forEach((fieldName) => {
-        const fieldValue = fields[fieldName];
-        if (fieldValue) {
-            if (typeof fieldValue === "string") {
-                try {
-                    parsedFields[fieldName] = JSON.parse(fieldValue);
-                } catch (error) {
-                    throw new Error(
-                        `Invalid JSON format for ${fieldName}: ${error.message}`
-                    );
+    jsonFields.forEach(field => {
+        const val = fields[field];
+        if(val) parsedFields[field] = typeof val === "string" ? JSON.parse(val) : val;
+    });
+
+    const gallery = [];
+    Object.keys(fields).forEach(key => {
+        // support gallery[0][image], gallery[0][title], gallery[0]['title'], gallery[0]["title"]
+        const match = key.match(/^gallery\[(\d+)\]\[(?:'|\")?(\w+)(?:'|\")?\]$/);
+        if(match){
+            const idx = parseInt(match[1]);
+            const subField = match[2];
+            if(!gallery[idx]) gallery[idx] = {};
+
+            if(subField === "image"){
+                if(typeof fields[key]==="string" && fields[key].startsWith("http")){
+                    gallery[idx][subField] = fields[key];
+                } else if(uploadedGalleryImages[key]){
+                    gallery[idx][subField] = uploadedGalleryImages[key];
                 }
-            } else if (Array.isArray(fieldValue)) {
-                parsedFields[fieldName] = fieldValue;
+            } else {
+                gallery[idx][subField] = fields[key];
             }
         }
     });
 
-    // Handle nested fields for gallery like gallery[0][title], gallery[0][image]
-    const gallery = [];
-    Object.keys(fields).forEach((key) => {
-        const match = key.match(/^gallery\[(\d+)\]\[(\w+)\]$/); // e.g. gallery[0][title]
-        if (match) {
-            const index = parseInt(match[1], 10);
-            const subField = match[2];
-
-            if (!gallery[index]) gallery[index] = {};
-            gallery[index][subField] = fields[key];
-        }
-    });
-
-    if (gallery.length > 0) {
-        parsedFields.gallery = gallery;
+    // Also create gallery items from uploaded file keys even if no text fields were sent
+    if(uploadedGalleryImages){
+        Object.keys(uploadedGalleryImages).forEach(key => {
+            const match = key.match(/^gallery\[(\d+)\]\[image\]$/);
+            if(match){
+                const idx = parseInt(match[1]);
+                if(!gallery[idx]) gallery[idx] = {};
+                gallery[idx].image = uploadedGalleryImages[key];
+            }
+        });
     }
+
+    parsedFields.gallery = gallery.filter(Boolean).map(item=>{
+        if(Array.isArray(item.image)) item.image = item.image[0];
+        return item;
+    });
 
     return parsedFields;
 };
 
-/**
- * @desc Create a new tour
- */
-/**
- * @desc Create a new tour
- */
-const createTour = async (req, res) => {
-    try {
-        const {
-            state,
-            title,
-            description,
-            difficulty,
-            duration,
-            altitude,
-            pickupPoints,
-            baseCamp,
-            minimumAge,
-            bestTimeToVisit,
-            availableDates, // now array
-            price,
-            summary,
-            location,
-            discount,
-        } = req.body;
+// CREATE TOUR
+const createTour = async (req,res)=>{
+    try{
+        const { state,title,description,difficulty,duration,altitude,pickupPoints,baseCamp,minimumAge,bestTimeToVisit,availableDates,price,summary,location,discount } = req.body;
 
-        // Parse JSON strings and nested fields
-        let parsedFields = {};
-        try {
-            parsedFields = parseComplexFields(req.body);
-        } catch (parseError) {
-            return res.status(400).json({
-                message: "Invalid JSON format for complex fields",
-                error: parseError.message,
-            });
-        }
-
+        // collect files from multer.any() into logical buckets
         let imageUrls = [];
-        if (req.imageUrls && req.imageUrls.length > 0) {
-            imageUrls = req.imageUrls;
-        }
-
-        // auto-calculate discountedPrice
-        let discountedPrice = price;
-        if (discount && discount > 0) {
-            discountedPrice = price - (price * discount) / 100;
-        }
-
-        // ✅ Ensure availableDates is always an array of Date objects
-        let parsedAvailableDates = [];
-        if (availableDates) {
-            if (typeof availableDates === "string") {
-                try {
-                    parsedAvailableDates = JSON.parse(availableDates).map(
-                        (d) => new Date(d)
-                    );
-                } catch (err) {
-                    return res.status(400).json({
-                        message: "Invalid format for availableDates. Send as array or JSON string.",
-                    });
+        const uploadedGalleryImages = {};
+        if(Array.isArray(req.files)){
+            const imageFiles = req.files.filter(f => f.fieldname === "images");
+            const galleryFiles = req.files.filter(f => /^gallery\[\d+\]\[image\]$/.test(f.fieldname));
+            if(imageFiles.length){
+                imageUrls = await Promise.all(imageFiles.map(file=>uploadToCloudinary(file.buffer)));
+            }
+            for(const file of galleryFiles){
+                uploadedGalleryImages[file.fieldname] = await uploadToCloudinary(file.buffer);
+            }
+        } else if(req.files){
+            // support multer.fields shape
+            if(req.files.images){
+                imageUrls = await Promise.all(req.files.images.map(file=>uploadToCloudinary(file.buffer)));
+            }
+            if(req.files.gallery){
+                for(const file of req.files.gallery){
+                    uploadedGalleryImages[file.fieldname] = await uploadToCloudinary(file.buffer);
                 }
-            } else if (Array.isArray(availableDates)) {
-                parsedAvailableDates = availableDates.map((d) => new Date(d));
-            } else {
-                parsedAvailableDates = [new Date(availableDates)];
             }
         }
 
+        const parsedFields = parseComplexFields(req.body, uploadedGalleryImages);
+
+        // discount calc
+        let discountedPrice = price;
+        if(discount && discount>0) discountedPrice = price - (price*discount)/100;
+
+        // availableDates parse
+        let parsedDates = [];
+        if(availableDates){
+            if(typeof availableDates==="string") parsedDates = JSON.parse(availableDates).map(d=>new Date(d));
+            else if(Array.isArray(availableDates)) parsedDates = availableDates.map(d=>new Date(d));
+            else parsedDates = [new Date(availableDates)];
+        }
+
         const newTour = new Tour({
-            state,
-            title,
-            description,
-            difficulty,
-            duration,
-            altitude,
-            pickupPoints,
-            baseCamp,
-            minimumAge,
-            bestTimeToVisit,
-            packages: parsedFields.packages || [],
-            availableDates: parsedAvailableDates, // ✅ fixed
-            sharingTypes: parsedFields.sharingTypes || [],
+            state,title,description,difficulty,duration,altitude,pickupPoints,baseCamp,minimumAge,bestTimeToVisit,
+            packages: parsedFields.packages||[],
+            availableDates: parsedDates,
+            sharingTypes: parsedFields.sharingTypes||[],
             images: imageUrls,
             price,
-            schedule: parsedFields.schedule || [],
+            schedule: parsedFields.schedule||[],
             summary,
-            placesToBeVisited: parsedFields.placesToBeVisited || [],
-            recommended: parsedFields.recommended || [],
+            placesToBeVisited: parsedFields.placesToBeVisited||[],
+            recommended: parsedFields.recommended||[],
             location,
-            trackActivity: parsedFields.trackActivity || [],
-            gallery: parsedFields.gallery || [],
+            trackActivity: parsedFields.trackActivity||[],
+            gallery: parsedFields.gallery||[],
             discount,
-            discountedPrice,
+            discountedPrice
         });
 
         const savedTour = await newTour.save();
         res.status(201).json(savedTour);
-    } catch (error) {
-        res.status(500).json({ message: "Error creating tour", error: error.message });
+
+    } catch(err){
+        res.status(500).json({ message:"Error creating tour", error: err.message });
     }
 };
 
-/**
- * @desc Get all tours
- */
-const getTours = async (req, res) => {
-    try {
-        const tours = await Tour.find().populate("state");
-        res.status(200).json(tours);
-    } catch (error) {
-        res
-            .status(500)
-            .json({ message: "Error fetching tours", error: error.message });
-    }
-};
-
-/**
- * @desc Get a single tour by ID
- */
-const getTourById = async (req, res) => {
-    try {
-        const tour = await Tour.findById(req.params.id).populate("state");
-        if (!tour) {
-            return res.status(404).json({ message: "Tour not found" });
-        }
-        res.status(200).json(tour);
-    } catch (error) {
-        res
-            .status(500)
-            .json({ message: "Error fetching tour", error: error.message });
-    }
-};
-
-/**
- * @desc Update a tour
- */
-const updateTour = async (req, res) => {
-    try {
+// UPDATE TOUR
+const updateTour = async (req,res)=>{
+    try{
         const { discount, price } = req.body;
 
         let imageUrls = [];
-        if (req.imageUrls && req.imageUrls.length > 0) {
-            imageUrls = req.imageUrls;
-        }
-
-        // Parse JSON strings and nested fields
-        let parsedFields = {};
-        try {
-            parsedFields = parseComplexFields(req.body);
-        } catch (parseError) {
-            return res.status(400).json({
-                message: "Invalid JSON format for complex fields",
-                error: parseError.message,
-            });
-        }
-
-        // calculate discounted price
-        let discountedPrice = price;
-        if (discount && discount > 0) {
-            discountedPrice = price - (price * discount) / 100;
-        }
-
-        // Prepare update data
-        const updateData = {
-            ...req.body,
-            discountedPrice,
-            ...(imageUrls.length > 0 && { images: imageUrls }), // only update images if new ones provided
-        };
-
-        // Replace complex fields with parsed versions if they exist
-        Object.keys(parsedFields).forEach((key) => {
-            if (parsedFields[key] && parsedFields[key].length > 0) {
-                updateData[key] = parsedFields[key];
+        const uploadedGalleryImages = {};
+        if(Array.isArray(req.files)){
+            const imageFiles = req.files.filter(f => f.fieldname === "images");
+            const galleryFiles = req.files.filter(f => /^gallery\[\d+\]\[image\]$/.test(f.fieldname));
+            if(imageFiles.length){
+                imageUrls = await Promise.all(imageFiles.map(file=>uploadToCloudinary(file.buffer)));
             }
-        });
-
-        const updatedTour = await Tour.findByIdAndUpdate(
-            req.params.id,
-            updateData,
-            { new: true }
-        );
-
-        if (!updatedTour) {
-            return res.status(404).json({ message: "Tour not found" });
+            for(const file of galleryFiles){
+                uploadedGalleryImages[file.fieldname] = await uploadToCloudinary(file.buffer);
+            }
+        } else if(req.files){
+            if(req.files.images){
+                imageUrls = await Promise.all(req.files.images.map(file=>uploadToCloudinary(file.buffer)));
+            }
+            if(req.files.gallery){
+                for(const file of req.files.gallery){
+                    uploadedGalleryImages[file.fieldname] = await uploadToCloudinary(file.buffer);
+                }
+            }
         }
 
+        const parsedFields = parseComplexFields(req.body, uploadedGalleryImages);
+
+        let discountedPrice = price;
+        if(discount && discount>0) discountedPrice = price - (price*discount)/100;
+
+        const updateData = { ...req.body, discountedPrice };
+        if(imageUrls.length>0) updateData.images = imageUrls;
+        if(parsedFields.gallery) updateData.gallery = parsedFields.gallery;
+        if(parsedFields.packages) updateData.packages = parsedFields.packages;
+        if(parsedFields.schedule) updateData.schedule = parsedFields.schedule;
+        if(parsedFields.recommended) updateData.recommended = parsedFields.recommended;
+        if(parsedFields.trackActivity) updateData.trackActivity = parsedFields.trackActivity;
+
+        const updatedTour = await Tour.findByIdAndUpdate(req.params.id, updateData,{ new:true });
+        if(!updatedTour) return res.status(404).json({ message:"Tour not found" });
         res.status(200).json(updatedTour);
-    } catch (error) {
-        res
-            .status(500)
-            .json({ message: "Error updating tour", error: error.message });
+
+    } catch(err){
+        res.status(500).json({ message:"Error updating tour", error: err.message });
     }
 };
 
-/**
- * @desc Delete a tour
- */
-const deleteTour = async (req, res) => {
-    try {
+// GET, DELETE, HIGHLIGHTS
+const getTours = async (req,res)=>{
+    try{
+        const tours = await Tour.find().populate("state");
+        res.status(200).json(tours);
+    } catch(err){
+        res.status(500).json({ message:"Error fetching tours", error: err.message });
+    }
+};
+
+const getTourById = async (req,res)=>{
+    try{
+        const tour = await Tour.findById(req.params.id).populate("state");
+        if(!tour) return res.status(404).json({ message:"Tour not found" });
+        res.status(200).json(tour);
+    } catch(err){
+        res.status(500).json({ message:"Error fetching tour", error: err.message });
+    }
+};
+
+const deleteTour = async (req,res)=>{
+    try{
         const deletedTour = await Tour.findByIdAndDelete(req.params.id);
-        if (!deletedTour) {
-            return res.status(404).json({ message: "Tour not found" });
-        }
-        res.status(200).json({ message: "Tour deleted successfully" });
-    } catch (error) {
-        res
-            .status(500)
-            .json({ message: "Error deleting tour", error: error.message });
+        if(!deletedTour) return res.status(404).json({ message:"Tour not found" });
+        res.status(200).json({ message:"Tour deleted successfully" });
+    } catch(err){
+        res.status(500).json({ message:"Error deleting tour", error: err.message });
     }
 };
 
-/**
- * @desc Get upcoming and popular tours
- * @route GET /tours/highlights
- */
-const getTourHighlights = async (req, res) => {
-    try {
+const getTourHighlights = async (req,res)=>{
+    try{
         const now = new Date();
-
-        // Upcoming: availableDates in the future, soonest first
-        const upcoming = await Tour.find({ availableDates: { $gte: now } })
-            .populate("state")
-            .sort({ availableDates: 1, createdAt: -1 });
-
-        // Popular: highest discount first, then most recent
-        const popular = await Tour.find({})
-            .populate("state")
-            .sort({ discount: -1, createdAt: -1 });
-
-        return res.status(200).json({ upcoming, popular });
-    } catch (error) {
-        return res.status(500).json({
-            message: "Error fetching tour highlights",
-            error: error.message,
-        });
+        const upcoming = await Tour.find({ availableDates:{ $gte: now } }).populate("state").sort({ availableDates:1, createdAt:-1 });
+        const popular = await Tour.find({}).populate("state").sort({ discount:-1, createdAt:-1 });
+        res.status(200).json({ upcoming, popular });
+    } catch(err){
+        res.status(500).json({ message:"Error fetching tour highlights", error: err.message });
     }
 };
 
-module.exports = {
-    createTour,
-    getTours,
-    getTourById,
-    updateTour,
-    deleteTour,
-    getTourHighlights,
-};
+module.exports = { createTour, updateTour, getTours, getTourById, deleteTour, getTourHighlights };
