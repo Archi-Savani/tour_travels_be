@@ -24,7 +24,7 @@ app.use("/api/state", stateRoutes);
 app.use("/api/tour", tourRoutes);
 app.use("/api/inquiry", inquiryRoutes);
 app.use("/api/hotelRoom", hotelRoomRoutes);
-app.use("/api/taxi", taxiTourRoutes);
+app.use("/api/taxiTour", taxiTourRoutes);
 
 const connectDB = async () => {
     try {
