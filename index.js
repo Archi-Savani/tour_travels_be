@@ -18,7 +18,7 @@ const app = express();
 
 app.use(cors());
 app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.urlencoded({ extended: true}));
 
 // Debug middleware to log requests
 app.use((req, res, next) => {
