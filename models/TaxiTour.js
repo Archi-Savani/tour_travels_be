@@ -44,7 +44,7 @@ const taxiTourSchema = new mongoose.Schema(
 		// For fix route: whether the trip is one-way or two-way
 		wayType: {
 			type: String,
-			enum: ["oneway", "twoway"],
+			enum: ["oneway", "roundtrip"],
 			required: function () {
 				return this.serviceType === "fix_route";
 			},
