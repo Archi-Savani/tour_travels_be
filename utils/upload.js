@@ -9,7 +9,7 @@ cloudinary.config({
     api_secret: process.env.CLOUD_API_SECRET
 });
 
-const uploadFile = async (fileBuffer) => {
+const uploadFile = async (fileBuffer, folder = "State") => {
     try {
         const fileSize = fileBuffer.length;
         const maxFileSize = 10 * 1024 * 1024; // 10MB
@@ -20,7 +20,10 @@ const uploadFile = async (fileBuffer) => {
 
         return new Promise((resolve, reject) => {
             const uploadOptions = {
-                folder: "State",
+                folder: folder,
+                resource_type: "auto", // Automatically detect image/video
+                quality: "auto", // Auto optimize quality
+                fetch_format: "auto" // Auto convert to modern formats
             };
 
             cloudinary.uploader.upload_stream(uploadOptions, (error, result) => {
@@ -34,6 +37,28 @@ const uploadFile = async (fileBuffer) => {
     } catch (error) {
         console.error(error.message);
         throw new Error("Error uploading file..");
+    }
+};
+
+// Specific function for blog image uploads
+const uploadBlogImage = async (fileBuffer) => {
+    return uploadFile(fileBuffer, "blogs");
+};
+
+// Function to delete image from Cloudinary
+const deleteImageFromCloudinary = async (imageUrl) => {
+    try {
+        // Extract public_id from Cloudinary URL
+        const urlParts = imageUrl.split('/');
+        const publicId = urlParts[urlParts.length - 1].split('.')[0];
+        const folder = urlParts[urlParts.length - 2];
+        const fullPublicId = `${folder}/${publicId}`;
+
+        const result = await cloudinary.uploader.destroy(fullPublicId);
+        return result;
+    } catch (error) {
+        console.error("Error deleting image from Cloudinary:", error);
+        throw new Error("Error deleting image from Cloudinary");
     }
 };
 
@@ -72,4 +97,4 @@ const uploadFilesToCloudinary = async (files) => {
     return urls;
 };
 
-module.exports = { uploadFile, uploadSingleImage, uploadToCloudinary, uploadFilesToCloudinary };
+module.exports = { uploadFile, uploadBlogImage, deleteImageFromCloudinary, uploadSingleImage, uploadToCloudinary, uploadFilesToCloudinary };

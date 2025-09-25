@@ -25,4 +25,6 @@ module.exports = {
         { name: "image", maxCount: 1 },
         { name: "taxiImage", maxCount: 1 },
     ]),
+    // For Blog model - single blog image
+    uploadBlogImage: upload.single("blogImage"),
 };
