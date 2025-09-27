@@ -1,5 +1,5 @@
 // controllers/scheduleController.js
-const Schedule = require("../models/Schedule");
+const Schedule = require("../models/schedule");
 
 /**
  * @desc    Create a new schedule
