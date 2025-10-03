@@ -4,7 +4,7 @@ const tourSchema = new mongoose.Schema(
     {
         state: {
             type: mongoose.Schema.Types.ObjectId,
-            ref: "State", // Reference to State model
+            ref: "State",
             required: true,
         },
         title: {
@@ -39,36 +39,40 @@ const tourSchema = new mongoose.Schema(
         bestTimeToVisit: {
             type: String,
         },
+
+        // ✅ packages now include sharingTypes
         packages: [
             {
                 from: { type: String }, // e.g. "Delhi"
                 price: { type: Number },
+                sharingTypes: [
+                    {
+                        type: { type: String }, // e.g. "room" / "tent"
+                        twoSharing: { type: Number },
+                        threeSharing: { type: Number },
+                        fourSharing: { type: Number },
+                    },
+                ],
             },
         ],
+
         availableDates: [
             {
                 type: Date,
-            }
-        ],
-        sharingTypes: [
-            {
-                type: {
-                    type: String, // e.g. "room" / "tent"
-                },
-                twoSharing: { type: Number },
-                threeSharing: { type: Number },
-                fourSharing: { type: Number },
             },
         ],
+
         images: [
             {
                 type: String, // image URLs
             },
         ],
+
         price: {
             type: Number, // Default shown price
             required: true,
         },
+
         schedule: [
             {
                 day: { type: Number },
@@ -76,39 +80,47 @@ const tourSchema = new mongoose.Schema(
                 desc: { type: String },
             },
         ],
+
         summary: {
             type: String,
         },
+
         placesToBeVisited: [
             {
                 type: String,
             },
         ],
+
         recommended: [
             {
                 title: { type: String },
                 points: [{ type: String }],
             },
         ],
+
         location: {
             type: String,
         },
+
         trackActivity: [
             {
                 title: { type: String },
                 points: [{ type: String }],
             },
         ],
+
         gallery: [
             {
                 image: { type: String },
                 title: { type: String },
             },
         ],
+
         discount: {
             type: Number, // percentage or flat discount
             default: 0,
         },
+
         discountedPrice: {
             type: Number,
         },

@@ -16,7 +16,6 @@ const parseComplexFields = (fields, uploadedGalleryImages) => {
     const parsedFields = {};
     const jsonFields = [
         "packages",
-        "sharingTypes",
         "schedule",
         "placesToBeVisited",
         "recommended",
@@ -24,15 +23,23 @@ const parseComplexFields = (fields, uploadedGalleryImages) => {
         "availableDates"
     ];
 
-    jsonFields.forEach(field => {
+    jsonFields.forEach((field) => {
         if (fields[field]) {
             parsedFields[field] = safeParse(fields[field]);
         }
     });
 
+    // ✅ ensure sharingTypes inside packages are parsed
+    if (parsedFields.packages && Array.isArray(parsedFields.packages)) {
+        parsedFields.packages = parsedFields.packages.map((pkg) => ({
+            ...pkg,
+            sharingTypes: pkg.sharingTypes ? safeParse(pkg.sharingTypes) : []
+        }));
+    }
+
     // Handle gallery parsing
     const gallery = [];
-    Object.keys(fields).forEach(key => {
+    Object.keys(fields).forEach((key) => {
         const match = key.match(/^gallery\[(\d+)\]\[(?:'|\")?(\w+)(?:'|\")?\]$/);
         if (match) {
             const idx = parseInt(match[1]);
@@ -52,7 +59,7 @@ const parseComplexFields = (fields, uploadedGalleryImages) => {
     });
 
     if (uploadedGalleryImages) {
-        Object.keys(uploadedGalleryImages).forEach(key => {
+        Object.keys(uploadedGalleryImages).forEach((key) => {
             const match = key.match(/^gallery\[(\d+)\]\[image\]$/);
             if (match) {
                 const idx = parseInt(match[1]);
@@ -62,7 +69,7 @@ const parseComplexFields = (fields, uploadedGalleryImages) => {
         });
     }
 
-    parsedFields.gallery = gallery.filter(Boolean).map(item => {
+    parsedFields.gallery = gallery.filter(Boolean).map((item) => {
         if (Array.isArray(item.image)) item.image = item.image[0];
         return item;
     });
@@ -84,7 +91,6 @@ const createTour = async (req, res) => {
             baseCamp,
             minimumAge,
             bestTimeToVisit,
-            availableDates,
             price,
             summary,
             location,
@@ -95,22 +101,19 @@ const createTour = async (req, res) => {
         let imageUrls = [];
         const uploadedGalleryImages = {};
         if (Array.isArray(req.files)) {
-            const imageFiles = req.files.filter(f => f.fieldname === "images");
-            const galleryFiles = req.files.filter(f => /^gallery\[\d+\]\[image\]$/.test(f.fieldname));
+            const imageFiles = req.files.filter((f) => f.fieldname === "images");
+            const galleryFiles = req.files.filter((f) =>
+                /^gallery\[\d+\]\[image\]$/.test(f.fieldname)
+            );
             if (imageFiles.length) {
-                imageUrls = await Promise.all(imageFiles.map(file => uploadToCloudinary(file.buffer)));
+                imageUrls = await Promise.all(
+                    imageFiles.map((file) => uploadToCloudinary(file.buffer))
+                );
             }
             for (const file of galleryFiles) {
-                uploadedGalleryImages[file.fieldname] = await uploadToCloudinary(file.buffer);
-            }
-        } else if (req.files) {
-            if (req.files.images) {
-                imageUrls = await Promise.all(req.files.images.map(file => uploadToCloudinary(file.buffer)));
-            }
-            if (req.files.gallery) {
-                for (const file of req.files.gallery) {
-                    uploadedGalleryImages[file.fieldname] = await uploadToCloudinary(file.buffer);
-                }
+                uploadedGalleryImages[file.fieldname] = await uploadToCloudinary(
+                    file.buffer
+                );
             }
         }
 
@@ -118,12 +121,13 @@ const createTour = async (req, res) => {
 
         // discount calc
         let discountedPrice = price;
-        if (discount && discount > 0) discountedPrice = price - (price * discount) / 100;
+        if (discount && discount > 0)
+            discountedPrice = price - (price * discount) / 100;
 
         // availableDates parse
         let parsedDates = [];
         if (parsedFields.availableDates) {
-            parsedDates = parsedFields.availableDates.map(d => new Date(d));
+            parsedDates = parsedFields.availableDates.map((d) => new Date(d));
         }
 
         const newTour = new Tour({
@@ -139,7 +143,6 @@ const createTour = async (req, res) => {
             bestTimeToVisit,
             packages: parsedFields.packages || [],
             availableDates: parsedDates,
-            sharingTypes: parsedFields.sharingTypes || [],
             images: imageUrls,
             price,
             schedule: parsedFields.schedule || [],
@@ -168,36 +171,33 @@ const updateTour = async (req, res) => {
         let imageUrls = [];
         const uploadedGalleryImages = {};
         if (Array.isArray(req.files)) {
-            const imageFiles = req.files.filter(f => f.fieldname === "images");
-            const galleryFiles = req.files.filter(f => /^gallery\[\d+\]\[image\]$/.test(f.fieldname));
+            const imageFiles = req.files.filter((f) => f.fieldname === "images");
+            const galleryFiles = req.files.filter((f) =>
+                /^gallery\[\d+\]\[image\]$/.test(f.fieldname)
+            );
             if (imageFiles.length) {
-                imageUrls = await Promise.all(imageFiles.map(file => uploadToCloudinary(file.buffer)));
+                imageUrls = await Promise.all(
+                    imageFiles.map((file) => uploadToCloudinary(file.buffer))
+                );
             }
             for (const file of galleryFiles) {
-                uploadedGalleryImages[file.fieldname] = await uploadToCloudinary(file.buffer);
-            }
-        } else if (req.files) {
-            if (req.files.images) {
-                imageUrls = await Promise.all(req.files.images.map(file => uploadToCloudinary(file.buffer)));
-            }
-            if (req.files.gallery) {
-                for (const file of req.files.gallery) {
-                    uploadedGalleryImages[file.fieldname] = await uploadToCloudinary(file.buffer);
-                }
+                uploadedGalleryImages[file.fieldname] = await uploadToCloudinary(
+                    file.buffer
+                );
             }
         }
 
         const parsedFields = parseComplexFields(req.body, uploadedGalleryImages);
 
         let discountedPrice = price;
-        if (discount && discount > 0) discountedPrice = price - (price * discount) / 100;
+        if (discount && discount > 0)
+            discountedPrice = price - (price * discount) / 100;
 
         const updateData = {
             ...req.body,
             discountedPrice,
             packages: parsedFields.packages || [],
-            availableDates: (parsedFields.availableDates || []).map(d => new Date(d)),
-            sharingTypes: parsedFields.sharingTypes || [],
+            availableDates: (parsedFields.availableDates || []).map((d) => new Date(d)),
             schedule: parsedFields.schedule || [],
             recommended: parsedFields.recommended || [],
             trackActivity: parsedFields.trackActivity || [],
@@ -206,8 +206,13 @@ const updateTour = async (req, res) => {
 
         if (imageUrls.length > 0) updateData.images = imageUrls;
 
-        const updatedTour = await Tour.findByIdAndUpdate(req.params.id, updateData, { new: true });
-        if (!updatedTour) return res.status(404).json({ message: "Tour not found" });
+        const updatedTour = await Tour.findByIdAndUpdate(
+            req.params.id,
+            updateData,
+            { new: true }
+        );
+        if (!updatedTour)
+            return res.status(404).json({ message: "Tour not found" });
         res.status(200).json(updatedTour);
     } catch (err) {
         res.status(500).json({ message: "Error updating tour", error: err.message });
@@ -239,7 +244,8 @@ const getTourById = async (req, res) => {
 const deleteTour = async (req, res) => {
     try {
         const deletedTour = await Tour.findByIdAndDelete(req.params.id);
-        if (!deletedTour) return res.status(404).json({ message: "Tour not found" });
+        if (!deletedTour)
+            return res.status(404).json({ message: "Tour not found" });
         res.status(200).json({ message: "Tour deleted successfully" });
     } catch (err) {
         res.status(500).json({ message: "Error deleting tour", error: err.message });
@@ -258,7 +264,9 @@ const getTourHighlights = async (req, res) => {
             .sort({ discount: -1, createdAt: -1 });
         res.status(200).json({ upcoming, popular });
     } catch (err) {
-        res.status(500).json({ message: "Error fetching tour highlights", error: err.message });
+        res
+            .status(500)
+            .json({ message: "Error fetching tour highlights", error: err.message });
     }
 };
 
