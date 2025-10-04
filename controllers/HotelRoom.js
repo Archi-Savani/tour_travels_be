@@ -20,13 +20,27 @@ const createHotelRoom = async (req, res) => {
             return res.status(400).json({ message: "Image is required" });
         }
 
+        let parsedAmenities = [];
+        if (amenities) {
+            try {
+                // If amenities is a JSON string like '["wifi","pool"]'
+                parsedAmenities = JSON.parse(amenities);
+                if (!Array.isArray(parsedAmenities)) {
+                    parsedAmenities = [parsedAmenities];
+                }
+            } catch {
+                // If amenities is a comma-separated string like "wifi,pool"
+                parsedAmenities = amenities.split(",").map(a => a.trim());
+            }
+        }
+
         const newHotelRoom = new HotelRoom({
             title,
             location,
             price,
             discount,
             overview,
-            amenities: amenities ? amenities.split(",") : [], // if sent as string
+            amenities: parsedAmenities,
             policies,
             image,
         });
@@ -38,9 +52,13 @@ const createHotelRoom = async (req, res) => {
             data: newHotelRoom,
         });
     } catch (error) {
-        res.status(500).json({ message: "Error creating hotel room", error: error.message });
+        res.status(500).json({
+            message: "Error creating hotel room",
+            error: error.message,
+        });
     }
 };
+
 
 // ✅ Get all Hotel Rooms
 const getHotelRooms = async (req, res) => {
