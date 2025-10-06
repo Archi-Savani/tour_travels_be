@@ -16,9 +16,7 @@ const stateSchema = new mongoose.Schema({
     },
     description: {
         type: String,
-        required: [true, "State description is required"],
-        minlength: 10,
-        maxlength: 2000
+        required: [true, "State description is required"]
     }
 }, { timestamps: true });
 
