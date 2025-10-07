@@ -20,6 +20,9 @@ router.post("/", uploadTourFiles, createTour);
 // Get all tours
 router.get("/", getTours);
 
+// Get upcoming and popular tours
+router.get("/highlights", getTourHighlights);
+
 // Get a single tour by ID
 router.get("/:id", getTourById);
 
@@ -29,7 +32,5 @@ router.put("/:id", uploadTourFiles, updateTour);
 // Delete a tour
 router.delete("/:id", deleteTour);
 
-// Get upcoming and popular tours
-router.get("/highlights", getTourHighlights);
 
 module.exports = router;

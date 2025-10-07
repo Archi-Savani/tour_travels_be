@@ -256,17 +256,28 @@ const deleteTour = async (req, res) => {
 const getTourHighlights = async (req, res) => {
     try {
         const now = new Date();
+
+        // Upcoming tours (future only)
         const upcoming = await Tour.find({ availableDates: { $gte: now } })
             .populate("state")
-            .sort({ availableDates: 1, createdAt: -1 });
-        const popular = await Tour.find({})
+            .sort({ availableDates: 1, createdAt: -1 })
+            .limit(10);
+
+        // Popular tours (high discount, not already in upcoming)
+        const popular = await Tour.find({
+            discount: { $gt: 0 },
+            availableDates: { $lt: now }, // only past or ongoing tours
+        })
             .populate("state")
-            .sort({ discount: -1, createdAt: -1 });
+            .sort({ discount: -1, createdAt: -1 })
+            .limit(10);
+
         res.status(200).json({ upcoming, popular });
     } catch (err) {
-        res
-            .status(500)
-            .json({ message: "Error fetching tour highlights", error: err.message });
+        res.status(500).json({
+            message: "Error fetching tour highlights",
+            error: err.message,
+        });
     }
 };
 
