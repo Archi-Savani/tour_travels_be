@@ -20,7 +20,7 @@ const parseComplexFields = (fields, uploadedGalleryImages) => {
         "placesToBeVisited",
         "recommended",
         "trackActivity",
-        "availableDates"
+        "date" // updated: single date field
     ];
 
     jsonFields.forEach((field) => {
@@ -94,7 +94,8 @@ const createTour = async (req, res) => {
             price,
             summary,
             location,
-            discount
+            discount,
+            date
         } = req.body;
 
         // collect files from multer.any()
@@ -124,11 +125,9 @@ const createTour = async (req, res) => {
         if (discount && discount > 0)
             discountedPrice = price - (price * discount) / 100;
 
-        // availableDates parse
-        let parsedDates = [];
-        if (parsedFields.availableDates) {
-            parsedDates = parsedFields.availableDates.map((d) => new Date(d));
-        }
+        // single date parse
+        let parsedDate = null;
+        if (date) parsedDate = new Date(date);
 
         const newTour = new Tour({
             state,
@@ -142,7 +141,7 @@ const createTour = async (req, res) => {
             minimumAge,
             bestTimeToVisit,
             packages: parsedFields.packages || [],
-            availableDates: parsedDates,
+            date: parsedDate,
             images: imageUrls,
             price,
             schedule: parsedFields.schedule || [],
@@ -166,7 +165,7 @@ const createTour = async (req, res) => {
 // UPDATE TOUR
 const updateTour = async (req, res) => {
     try {
-        const { discount, price } = req.body;
+        const { discount, price, date } = req.body;
 
         let imageUrls = [];
         const uploadedGalleryImages = {};
@@ -197,7 +196,7 @@ const updateTour = async (req, res) => {
             ...req.body,
             discountedPrice,
             packages: parsedFields.packages || [],
-            availableDates: (parsedFields.availableDates || []).map((d) => new Date(d)),
+            date: date ? new Date(date) : undefined,
             schedule: parsedFields.schedule || [],
             recommended: parsedFields.recommended || [],
             trackActivity: parsedFields.trackActivity || [],
@@ -258,15 +257,15 @@ const getTourHighlights = async (req, res) => {
         const now = new Date();
 
         // Upcoming tours (future only)
-        const upcoming = await Tour.find({ availableDates: { $gte: now } })
+        const upcoming = await Tour.find({ date: { $gte: now } })
             .populate("state")
-            .sort({ availableDates: 1, createdAt: -1 })
+            .sort({ date: 1, createdAt: -1 })
             .limit(10);
 
-        // Popular tours (high discount, not already in upcoming)
+        // Popular tours (high discount, past or ongoing)
         const popular = await Tour.find({
             discount: { $gt: 0 },
-            availableDates: { $lt: now }, // only past or ongoing tours
+            date: { $lt: now },
         })
             .populate("state")
             .sort({ discount: -1, createdAt: -1 })
