@@ -16,11 +16,21 @@ const tourSchema = new mongoose.Schema(
             type: String,
             required: true,
         },
+        difficulty: {
+            type: String,
+            required: true,
+        },
         duration: {
             type: String, // e.g. "5 Days / 4 Nights"
             required: true,
         },
+        altitude: {
+            type: String, // e.g. "12,500 ft"
+        },
         pickupPoints: {
+            type: String,
+        },
+        baseCamp: {
             type: String,
         },
         minimumAge: {
@@ -47,6 +57,7 @@ const tourSchema = new mongoose.Schema(
         ],
         date: {
             type: Date,
+            required: true, // makes the date mandatory
         },
 
         images: [
@@ -85,6 +96,17 @@ const tourSchema = new mongoose.Schema(
             },
         ],
 
+        location: {
+            type: String,
+        },
+
+        trackActivity: [
+            {
+                title: { type: String },
+                points: [{ type: String }],
+            },
+        ],
+
         gallery: [
             {
                 image: { type: String },
@@ -99,22 +121,6 @@ const tourSchema = new mongoose.Schema(
 
         discountedPrice: {
             type: Number,
-        },
-
-        // ✅ NEW FIELDS
-        rating: {
-            type: Number,
-            default: 0, // e.g. 4.5
-            min: 0,
-            max: 5,
-        },
-        tourType: {
-            type: String,
-            enum: ["upcoming", "popular"],
-        },
-        famousCity: {
-            type: String,
-            trim: true,
         },
     },
     { timestamps: true }

@@ -1,3 +1,4 @@
+// controllers/tourController.js
 const Tour = require("../models/Tour");
 const { uploadToCloudinary } = require("../utils/upload");
 
@@ -6,7 +7,7 @@ const safeParse = (val) => {
     try {
         return typeof val === "string" ? JSON.parse(val) : val;
     } catch (err) {
-        return val;
+        return val; // fallback if invalid JSON
     }
 };
 
@@ -19,7 +20,7 @@ const parseComplexFields = (fields, uploadedGalleryImages) => {
         "placesToBeVisited",
         "recommended",
         "trackActivity",
-        "date"
+        "availableDates"
     ];
 
     jsonFields.forEach((field) => {
@@ -93,11 +94,7 @@ const createTour = async (req, res) => {
             price,
             summary,
             location,
-            discount,
-            date,
-            rating,
-            tourType,
-            famousCity
+            discount
         } = req.body;
 
         // collect files from multer.any()
@@ -127,9 +124,11 @@ const createTour = async (req, res) => {
         if (discount && discount > 0)
             discountedPrice = price - (price * discount) / 100;
 
-        // single date parse
-        let parsedDate = null;
-        if (date) parsedDate = new Date(date);
+        // availableDates parse
+        let parsedDates = [];
+        if (parsedFields.availableDates) {
+            parsedDates = parsedFields.availableDates.map((d) => new Date(d));
+        }
 
         const newTour = new Tour({
             state,
@@ -143,7 +142,7 @@ const createTour = async (req, res) => {
             minimumAge,
             bestTimeToVisit,
             packages: parsedFields.packages || [],
-            date: parsedDate,
+            availableDates: parsedDates,
             images: imageUrls,
             price,
             schedule: parsedFields.schedule || [],
@@ -154,11 +153,7 @@ const createTour = async (req, res) => {
             trackActivity: parsedFields.trackActivity || [],
             gallery: parsedFields.gallery || [],
             discount,
-            discountedPrice,
-            // ✅ new fields
-            rating: rating || 0,
-            tourType: tourType || "normal",
-            famousCity: famousCity || ""
+            discountedPrice
         });
 
         const savedTour = await newTour.save();
@@ -171,7 +166,7 @@ const createTour = async (req, res) => {
 // UPDATE TOUR
 const updateTour = async (req, res) => {
     try {
-        const { discount, price, date } = req.body;
+        const { discount, price } = req.body;
 
         let imageUrls = [];
         const uploadedGalleryImages = {};
@@ -202,17 +197,12 @@ const updateTour = async (req, res) => {
             ...req.body,
             discountedPrice,
             packages: parsedFields.packages || [],
-            date: date ? new Date(date) : undefined,
+            availableDates: (parsedFields.availableDates || []).map((d) => new Date(d)),
             schedule: parsedFields.schedule || [],
             recommended: parsedFields.recommended || [],
             trackActivity: parsedFields.trackActivity || [],
             gallery: parsedFields.gallery || []
         };
-
-        // ✅ ensure new fields can be updated too
-        if (req.body.rating !== undefined) updateData.rating = req.body.rating;
-        if (req.body.tourType) updateData.tourType = req.body.tourType;
-        if (req.body.famousCity) updateData.famousCity = req.body.famousCity;
 
         if (imageUrls.length > 0) updateData.images = imageUrls;
 
@@ -262,10 +252,40 @@ const deleteTour = async (req, res) => {
     }
 };
 
+// GET TOUR HIGHLIGHTS
+const getTourHighlights = async (req, res) => {
+    try {
+        const now = new Date();
+
+        // Upcoming tours (future only)
+        const upcoming = await Tour.find({ availableDates: { $gte: now } })
+            .populate("state")
+            .sort({ availableDates: 1, createdAt: -1 })
+            .limit(10);
+
+        // Popular tours (high discount, not already in upcoming)
+        const popular = await Tour.find({
+            discount: { $gt: 0 },
+            availableDates: { $lt: now }, // only past or ongoing tours
+        })
+            .populate("state")
+            .sort({ discount: -1, createdAt: -1 })
+            .limit(10);
+
+        res.status(200).json({ upcoming, popular });
+    } catch (err) {
+        res.status(500).json({
+            message: "Error fetching tour highlights",
+            error: err.message,
+        });
+    }
+};
+
 module.exports = {
     createTour,
     updateTour,
     getTours,
     getTourById,
     deleteTour,
+    getTourHighlights
 };
