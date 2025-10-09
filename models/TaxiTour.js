@@ -47,18 +47,18 @@ const cabSchema = new mongoose.Schema(
 );
 
 // ✅ Conditional validation: if routeType is "oneway", pickup/drop/date/time must exist
-cabSchema.pre("validate", function (next) {
-	if (this.routeType === "oneway") {
-		if (!this.pickup || !this.drop || !this.date || !this.time) {
-			return next(
-				new Error(
-					"Pickup, drop, date, and time are required for One Way routes."
-				)
-			);
-		}
-	}
-	next();
-});
+// cabSchema.pre("validate", function (next) {
+// 	if (this.routeType === "oneway") {
+// 		if (!this.pickup || !this.drop || !this.date || !this.time) {
+// 			return next(
+// 				new Error(
+// 					"Pickup, drop, date, and time are required for One Way routes."
+// 				)
+// 			);
+// 		}
+// 	}
+// 	next();
+// });
 
 const Cab = mongoose.model("Cab", cabSchema);
 module.exports = Cab;
