@@ -32,14 +32,14 @@ const createCab = async (req, res) => {
         }
 
         // 🧠 For oneway, ensure required fields exist
-        if (routeType === "oneway") {
-            if (!pickup || !drop || !date || !time) {
-                return res.status(400).json({
-                    ok: false,
-                    error: "Pickup, drop, date, and time are required for One Way routes.",
-                });
-            }
-        }
+        // if (routeType === "oneway") {
+        //     if (!pickup || !drop || !date || !time) {
+        //         return res.status(400).json({
+        //             ok: false,
+        //             error: "Pickup, drop, date, and time are required for One Way routes.",
+        //         });
+        //     }
+        // }
 
         // 🧠 Upload image to Cloudinary
         let imageUrl = "";
