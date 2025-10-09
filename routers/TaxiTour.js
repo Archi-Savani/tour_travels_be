@@ -1,25 +1,27 @@
-// routes/taxiRoutes.js
 const express = require("express");
 const router = express.Router();
+const {
+    upload,
+    createCab,
+    getAllCabs,
+    getCabById,
+    updateCab,
+    deleteCab,
+} = require("../controllers/TaxiTour");
 
-const { createTaxi, getTaxis, getTaxiById, updateTaxi, deleteTaxi } = require("../controllers/TaxiTour");
-const { uploadTaxiImage } = require("../middleware/multer");
+// Create Cab (multipart/form-data)
+router.post("/", upload.single("image"), createCab);
 
-// Create taxi service
-router.post("/", uploadTaxiImage, createTaxi);
+// Get all Cabs
+router.get("/", getAllCabs);
 
-// List all taxi services
-router.get("/", getTaxis);
+// Get single Cab
+router.get("/:id", getCabById);
 
-// Get taxi service by id
-router.get("/:id", getTaxiById);
+// Update Cab
+router.put("/:id", upload.single("image"), updateCab);
 
-// Update taxi service
-router.put("/:id", uploadTaxiImage, updateTaxi);
-
-// Delete taxi service
-router.delete("/:id", deleteTaxi);
+// Delete Cab
+router.delete("/:id", deleteCab);
 
 module.exports = router;
-
-

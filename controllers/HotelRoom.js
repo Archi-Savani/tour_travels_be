@@ -11,6 +11,7 @@ const createHotelRoom = async (req, res) => {
             overview,
             amenities,
             policies,
+            rating, // 🟢 Added rating field
         } = req.body;
 
         // Cloudinary image URL from middleware
@@ -43,6 +44,7 @@ const createHotelRoom = async (req, res) => {
             amenities: parsedAmenities,
             policies,
             image,
+            rating: rating ? Number(rating) : 0, // 🟢 Safely assign rating
         });
 
         await newHotelRoom.save();
@@ -59,14 +61,16 @@ const createHotelRoom = async (req, res) => {
     }
 };
 
-
 // ✅ Get all Hotel Rooms
 const getHotelRooms = async (req, res) => {
     try {
         const rooms = await HotelRoom.find().sort({ createdAt: -1 });
         res.status(200).json(rooms);
     } catch (error) {
-        res.status(500).json({ message: "Error fetching hotel rooms", error: error.message });
+        res.status(500).json({
+            message: "Error fetching hotel rooms",
+            error: error.message,
+        });
     }
 };
 
@@ -79,7 +83,10 @@ const getHotelRoomById = async (req, res) => {
         }
         res.status(200).json(room);
     } catch (error) {
-        res.status(500).json({ message: "Error fetching hotel room", error: error.message });
+        res.status(500).json({
+            message: "Error fetching hotel room",
+            error: error.message,
+        });
     }
 };
 
@@ -94,6 +101,7 @@ const updateHotelRoom = async (req, res) => {
             overview,
             amenities,
             policies,
+            rating, // 🟢 Added rating field
         } = req.body;
 
         const updateData = {
@@ -102,9 +110,16 @@ const updateHotelRoom = async (req, res) => {
             price,
             discount,
             overview,
-            amenities: amenities ? amenities.split(",") : [],
+            amenities: amenities
+                ? amenities.split(",").map(a => a.trim())
+                : [],
             policies,
         };
+
+        // 🟢 Include rating if provided
+        if (rating !== undefined) {
+            updateData.rating = Number(rating);
+        }
 
         if (req.imageUrl) {
             updateData.image = req.imageUrl;
@@ -125,7 +140,10 @@ const updateHotelRoom = async (req, res) => {
             data: updatedRoom,
         });
     } catch (error) {
-        res.status(500).json({ message: "Error updating hotel room", error: error.message });
+        res.status(500).json({
+            message: "Error updating hotel room",
+            error: error.message,
+        });
     }
 };
 
@@ -138,7 +156,10 @@ const deleteHotelRoom = async (req, res) => {
         }
         res.status(200).json({ message: "Hotel Room deleted successfully" });
     } catch (error) {
-        res.status(500).json({ message: "Error deleting hotel room", error: error.message });
+        res.status(500).json({
+            message: "Error deleting hotel room",
+            error: error.message,
+        });
     }
 };
 

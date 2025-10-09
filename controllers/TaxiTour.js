@@ -1,145 +1,235 @@
-const TaxiTour = require("../models/TaxiTour");
-const { uploadToCloudinary } = require("../utils/upload");
+const Cab = require("../models/TaxiTour");
+const multer = require("multer");
+const { uploadFile, deleteImageFromCloudinary } = require("../utils/upload");
 
-// Normalize different forms of incoming 'feactures' into a clean string array
-const normalizeFeactures = (body) => {
-    // 1) Direct array already parsed by express
-    if (Array.isArray(body.feactures)) {
-        return body.feactures;
-    }
-    // 2) JSON string
-    if (typeof body.feactures === "string") {
-        const val = body.feactures.trim();
-        if (val.startsWith("[") && val.endsWith("]")) {
-            try {
-                const parsed = JSON.parse(val);
-                return Array.isArray(parsed) ? parsed : [];
-            } catch (_) {
-                // fallthrough to comma-separated
+// ------------------------------------
+// 🧠 MULTER MEMORY STORAGE (for buffer)
+// ------------------------------------
+const storage = multer.memoryStorage();
+const upload = multer({ storage });
+
+// ------------------------------------
+// 🟢 CREATE CAB
+// ------------------------------------
+const createCab = async (req, res) => {
+    try {
+        const {
+            routeType,
+            pickup,
+            drop,
+            date,
+            time,
+            seater,
+            carName,
+        } = req.body;
+
+        // 🧠 Validate route type
+        if (!routeType) {
+            return res.status(400).json({
+                ok: false,
+                error: "routeType is required (oneway or roundtrip).",
+            });
+        }
+
+        // 🧠 For oneway, ensure required fields exist
+        if (routeType === "oneway") {
+            if (!pickup || !drop || !date || !time) {
+                return res.status(400).json({
+                    ok: false,
+                    error: "Pickup, drop, date, and time are required for One Way routes.",
+                });
             }
         }
-        // 3) Comma separated string
-        if (val.length > 0) {
-            return val.split(",").map(s => s.trim()).filter(Boolean);
-        }
-        return [];
-    }
-    // 4) Bracketed keys: feactures[0], feactures[1], ...
-    const indexedKeys = Object.keys(body).filter(k => /^feactures\[(\d+)\]$/.test(k));
-    if (indexedKeys.length > 0) {
-        return indexedKeys
-            .sort((a, b) => parseInt(a.match(/\d+/)[0]) - parseInt(b.match(/\d+/)[0]))
-            .map(k => body[k])
-            .filter(v => typeof v === "string" ? v.trim().length > 0 : Boolean(v));
-    }
-    // 5) Repeated field name feactures without [] can be given by some clients
-    if (body["feactures[]"]) {
-        const v = body["feactures[]"]; // can be string or array
-        return Array.isArray(v) ? v : [v];
-    }
-    return [];
-};
 
-// CREATE TAXI SERVICE
-const createTaxi = async (req, res) => {
-    try {
-        const { serviceType, name, from, to, price, wayType, perKmPrice } = req.body;
-
-        let imageUrl = null;
-        if (req.files && req.files.image && req.files.image[0]) {
-            imageUrl = await uploadToCloudinary(req.files.image[0].buffer);
-        } else if (req.files && req.files.taxiImage && req.files.taxiImage[0]) {
-            imageUrl = await uploadToCloudinary(req.files.taxiImage[0].buffer);
+        // 🧠 Upload image to Cloudinary
+        let imageUrl = "";
+        if (req.file) {
+            imageUrl = await uploadFile(req.file.buffer, "cabs");
+        } else {
+            return res.status(400).json({
+                ok: false,
+                error: "Cab image is required.",
+            });
         }
 
-        const payload = {
-            serviceType,
-            name,
-            image: imageUrl || req.body.image, // allow passing an existing URL
-        };
+        // 🧠 Create Cab object
+        const cab = new Cab({
+            routeType,
+            pickup: routeType === "oneway" ? pickup : undefined,
+            drop: routeType === "oneway" ? drop : undefined,
+            date: routeType === "oneway" ? date : undefined,
+            time: routeType === "oneway" ? time : undefined,
+            seater,
+            carName,
+            image: imageUrl,
+        });
 
-        if (serviceType === "fix_route") {
-            payload.from = from;
-            payload.to = to;
-            payload.price = price;
-            payload.wayType = wayType; // oneway | twoway
-        } else if (serviceType === "per_km") {
-            payload.perKmPrice = perKmPrice;
-            payload.feactures = normalizeFeactures(req.body);
+        await cab.save();
+
+        res.status(201).json({
+            ok: true,
+            message: "Cab created successfully",
+            data: cab,
+        });
+    } catch (error) {
+        console.error("❌ Error creating cab:", error);
+        res.status(500).json({
+            ok: false,
+            error: error.message,
+        });
+    }
+};
+
+// ------------------------------------
+// 🟢 GET ALL CABS
+// ------------------------------------
+const getAllCabs = async (req, res) => {
+    try {
+        const cabs = await Cab.find().sort({ createdAt: -1 });
+        res.status(200).json({
+            ok: true,
+            count: cabs.length,
+            data: cabs,
+        });
+    } catch (error) {
+        res.status(500).json({
+            ok: false,
+            error: error.message,
+        });
+    }
+};
+
+// ------------------------------------
+// 🟢 GET CAB BY ID
+// ------------------------------------
+const getCabById = async (req, res) => {
+    try {
+        const cab = await Cab.findById(req.params.id);
+        if (!cab) {
+            return res.status(404).json({
+                ok: false,
+                error: "Cab not found",
+            });
+        }
+        res.status(200).json({
+            ok: true,
+            data: cab,
+        });
+    } catch (error) {
+        res.status(500).json({
+            ok: false,
+            error: error.message,
+        });
+    }
+};
+
+// ------------------------------------
+// 🟢 UPDATE CAB
+// ------------------------------------
+const updateCab = async (req, res) => {
+    try {
+        const cab = await Cab.findById(req.params.id);
+        if (!cab) {
+            return res.status(404).json({
+                ok: false,
+                error: "Cab not found",
+            });
         }
 
-        // Always persist feactures if provided, for both service types
-        const normalizedFeactures = normalizeFeactures(req.body);
-        if (normalizedFeactures && Array.isArray(normalizedFeactures)) {
-            payload.feactures = normalizedFeactures;
+        const {
+            routeType,
+            pickup,
+            drop,
+            date,
+            time,
+            seater,
+            carName,
+        } = req.body;
+
+        // 🧠 Update basic fields
+        if (routeType) cab.routeType = routeType;
+        if (seater) cab.seater = seater;
+        if (carName) cab.carName = carName;
+
+        // 🧠 Handle image update
+        if (req.file) {
+            // Delete old image from Cloudinary
+            if (cab.image) {
+                await deleteImageFromCloudinary(cab.image);
+            }
+
+            // Upload new image
+            const newImageUrl = await uploadFile(req.file.buffer, "cabs");
+            cab.image = newImageUrl;
         }
 
-        const doc = new TaxiTour(payload);
-        const saved = await doc.save();
-        res.status(201).json(saved);
-    } catch (err) {
-        res.status(500).json({ message: "Error creating taxi service", error: err.message });
-    }
-};
-
-// UPDATE TAXI SERVICE
-const updateTaxi = async (req, res) => {
-    try {
-        const { id } = req.params;
-        const update = { ...req.body };
-
-        // Normalize feactures if sent as JSON string
-        // Normalize and persist feactures on update for both service types
-        const normalized = normalizeFeactures(req.body);
-        if (normalized) update.feactures = normalized;
-
-        // Handle image replacement
-        if (req.files && req.files.image && req.files.image[0]) {
-            update.image = await uploadToCloudinary(req.files.image[0].buffer);
-        } else if (req.files && req.files.taxiImage && req.files.taxiImage[0]) {
-            update.image = await uploadToCloudinary(req.files.taxiImage[0].buffer);
+        // 🧠 Conditional field update for One Way
+        if (cab.routeType === "oneway") {
+            cab.pickup = pickup || cab.pickup;
+            cab.drop = drop || cab.drop;
+            cab.date = date || cab.date;
+            cab.time = time || cab.time;
+        } else {
+            cab.pickup = undefined;
+            cab.drop = undefined;
+            cab.date = undefined;
+            cab.time = undefined;
         }
 
-        const updated = await TaxiTour.findByIdAndUpdate(id, update, { new: true, runValidators: true });
-        if (!updated) return res.status(404).json({ message: "Taxi service not found" });
-        res.status(200).json(updated);
-    } catch (err) {
-        res.status(500).json({ message: "Error updating taxi service", error: err.message });
+        await cab.save();
+
+        res.status(200).json({
+            ok: true,
+            message: "Cab updated successfully",
+            data: cab,
+        });
+    } catch (error) {
+        console.error("❌ Error updating cab:", error);
+        res.status(500).json({
+            ok: false,
+            error: error.message,
+        });
     }
 };
 
-// LIST ALL
-const getTaxis = async (_req, res) => {
+// ------------------------------------
+// 🟢 DELETE CAB
+// ------------------------------------
+const deleteCab = async (req, res) => {
     try {
-        const list = await TaxiTour.find().sort({ createdAt: -1 });
-        res.status(200).json(list);
-    } catch (err) {
-        res.status(500).json({ message: "Error fetching taxi services", error: err.message });
+        const cab = await Cab.findById(req.params.id);
+        if (!cab) {
+            return res.status(404).json({
+                ok: false,
+                error: "Cab not found",
+            });
+        }
+
+        // Delete image from Cloudinary
+        if (cab.image) {
+            await deleteImageFromCloudinary(cab.image);
+        }
+
+        await Cab.findByIdAndDelete(req.params.id);
+
+        res.status(200).json({
+            ok: true,
+            message: "Cab deleted successfully",
+        });
+    } catch (error) {
+        console.error("❌ Error deleting cab:", error);
+        res.status(500).json({
+            ok: false,
+            error: error.message,
+        });
     }
 };
 
-// GET BY ID
-const getTaxiById = async (req, res) => {
-    try {
-        const doc = await TaxiTour.findById(req.params.id);
-        if (!doc) return res.status(404).json({ message: "Taxi service not found" });
-        res.status(200).json(doc);
-    } catch (err) {
-        res.status(500).json({ message: "Error fetching taxi service", error: err.message });
-    }
+module.exports = {
+    upload,
+    createCab,
+    getAllCabs,
+    getCabById,
+    updateCab,
+    deleteCab,
 };
-
-// DELETE
-const deleteTaxi = async (req, res) => {
-    try {
-        const deleted = await TaxiTour.findByIdAndDelete(req.params.id);
-        if (!deleted) return res.status(404).json({ message: "Taxi service not found" });
-        res.status(200).json({ message: "Taxi service deleted successfully" });
-    } catch (err) {
-        res.status(500).json({ message: "Error deleting taxi service", error: err.message });
-    }
-};
-
-module.exports = { createTaxi, updateTaxi, getTaxis, getTaxiById, deleteTaxi };
-
-

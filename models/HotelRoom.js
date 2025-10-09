@@ -45,6 +45,14 @@ const hotelRoomSchema = new mongoose.Schema(
             type: String, // Cloudinary URL or local file path
             required: true,
         },
+
+        // ✅ New field added
+        rating: {
+            type: Number,
+            min: 0,
+            max: 5,
+            default: 0, // optional: default average rating
+        },
     },
     { timestamps: true }
 );

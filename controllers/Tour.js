@@ -1,4 +1,3 @@
-// controllers/tourController.js
 const Tour = require("../models/Tour");
 const { uploadToCloudinary } = require("../utils/upload");
 
@@ -7,7 +6,7 @@ const safeParse = (val) => {
     try {
         return typeof val === "string" ? JSON.parse(val) : val;
     } catch (err) {
-        return val; // fallback if invalid JSON
+        return val;
     }
 };
 
@@ -20,7 +19,7 @@ const parseComplexFields = (fields, uploadedGalleryImages) => {
         "placesToBeVisited",
         "recommended",
         "trackActivity",
-        "date" // updated: single date field
+        "date"
     ];
 
     jsonFields.forEach((field) => {
@@ -95,7 +94,10 @@ const createTour = async (req, res) => {
             summary,
             location,
             discount,
-            date
+            date,
+            rating,
+            tourType,
+            famousCity
         } = req.body;
 
         // collect files from multer.any()
@@ -152,7 +154,11 @@ const createTour = async (req, res) => {
             trackActivity: parsedFields.trackActivity || [],
             gallery: parsedFields.gallery || [],
             discount,
-            discountedPrice
+            discountedPrice,
+            // ✅ new fields
+            rating: rating || 0,
+            tourType: tourType || "normal",
+            famousCity: famousCity || ""
         });
 
         const savedTour = await newTour.save();
@@ -203,6 +209,11 @@ const updateTour = async (req, res) => {
             gallery: parsedFields.gallery || []
         };
 
+        // ✅ ensure new fields can be updated too
+        if (req.body.rating !== undefined) updateData.rating = req.body.rating;
+        if (req.body.tourType) updateData.tourType = req.body.tourType;
+        if (req.body.famousCity) updateData.famousCity = req.body.famousCity;
+
         if (imageUrls.length > 0) updateData.images = imageUrls;
 
         const updatedTour = await Tour.findByIdAndUpdate(
@@ -251,40 +262,10 @@ const deleteTour = async (req, res) => {
     }
 };
 
-// GET TOUR HIGHLIGHTS
-const getTourHighlights = async (req, res) => {
-    try {
-        const now = new Date();
-
-        // Upcoming tours (future only)
-        const upcoming = await Tour.find({ date: { $gte: now } })
-            .populate("state")
-            .sort({ date: 1, createdAt: -1 })
-            .limit(10);
-
-        // Popular tours (high discount, past or ongoing)
-        const popular = await Tour.find({
-            discount: { $gt: 0 },
-            date: { $lt: now },
-        })
-            .populate("state")
-            .sort({ discount: -1, createdAt: -1 })
-            .limit(10);
-
-        res.status(200).json({ upcoming, popular });
-    } catch (err) {
-        res.status(500).json({
-            message: "Error fetching tour highlights",
-            error: err.message,
-        });
-    }
-};
-
 module.exports = {
     createTour,
     updateTour,
     getTours,
     getTourById,
     deleteTour,
-    getTourHighlights
 };

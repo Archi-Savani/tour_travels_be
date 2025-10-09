@@ -20,9 +20,6 @@ router.post("/", uploadTourFiles, createTour);
 // Get all tours
 router.get("/", getTours);
 
-// Get upcoming and popular tours
-router.get("/highlights", getTourHighlights);
-
 // Get a single tour by ID
 router.get("/:id", getTourById);
 

@@ -1,86 +1,64 @@
 const mongoose = require("mongoose");
 
-const taxiTourSchema = new mongoose.Schema(
+const cabSchema = new mongoose.Schema(
 	{
-		serviceType: {
-			type: String,
-			enum: ["fix_route", "per_km"],
-			required: true,
-			trim: true,
-		},
-		name: {
-			type: String,
-			required: true,
-			trim: true,
-		},
-		image: {
-			type: String, // single image URL or path
-			required: true,
-		},
-
-		// Fields for serviceType === "fix_route"
-		from: {
-			type: String,
-			required: function () {
-				return this.serviceType === "fix_route";
-			},
-			trim: true,
-		},
-		to: {
-			type: String,
-			required: function () {
-				return this.serviceType === "fix_route";
-			},
-			trim: true,
-		},
-		price: {
-			type: Number,
-			required: function () {
-				return this.serviceType === "fix_route";
-			},
-			min: 0,
-		},
-
-		// For fix route: whether the trip is one-way or two-way
-		wayType: {
+		routeType: {
 			type: String,
 			enum: ["oneway", "roundtrip"],
-			required: function () {
-				return this.serviceType === "fix_route";
-			},
+			required: true,
+		},
+
+		// 🟢 Common fields for both One Way and Round Trip
+		seater: {
+			type: String,
+			enum: ["4", "7", "tempo_traveller"],
+			required: true,
+		},
+
+		carName: {
+			type: String,
+			required: true,
 			trim: true,
 		},
 
-		// Fields for serviceType === "per_km"
-		perKmPrice: {
-			type: Number,
-			required: function () {
-				return this.serviceType === "per_km";
-			},
-			min: 0,
+		image: {
+			type: String, // Single image (Cloudinary URL)
+			required: true,
 		},
-		feactures: [
-			{
-				type: String,
-				trim: true,
-			},
-		],
+
+		// 🟢 Fields specific to One Way route type
+		pickup: {
+			type: String,
+			trim: true,
+		},
+		drop: {
+			type: String,
+			trim: true,
+		},
+		date: {
+			type: Date,
+		},
+		time: {
+			type: String, // Example: "10:30 AM"
+			trim: true,
+		},
 	},
 	{ timestamps: true }
 );
 
-// Additional validation to ensure arrays present when needed
-taxiTourSchema.pre("validate", function (next) {
-	if (this.serviceType === "per_km") {
-		if (!Array.isArray(this.feactures)) {
-			this.feactures = [];
+// ✅ Conditional validation: if routeType is "oneway", pickup/drop/date/time must exist
+cabSchema.pre("validate", function (next) {
+	if (this.routeType === "oneway") {
+		if (!this.pickup || !this.drop || !this.date || !this.time) {
+			return next(
+				new Error(
+					"Pickup, drop, date, and time are required for One Way routes."
+				)
+			);
 		}
 	}
 	next();
 });
 
-const TaxiTour = mongoose.model("TaxiTour", taxiTourSchema);
-
-module.exports = TaxiTour;
-
-
+const Cab = mongoose.model("Cab", cabSchema);
+module.exports = Cab;
