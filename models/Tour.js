@@ -55,10 +55,10 @@ const tourSchema = new mongoose.Schema(
                 ],
             },
         ],
-        date: {
-            type: Date,
-            required: true, // makes the date mandatory
-        },
+        // date: {
+        //     type: Date,
+        //     required: true, // makes the date mandatory
+        // },
 
         images: [
             {
