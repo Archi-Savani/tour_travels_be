@@ -25,7 +25,6 @@ const cabSchema = new mongoose.Schema(
             type: String, // Cloudinary URL
             required: true,
         },
-
         features: {
             type: [String], // ✅ Now common for both routess
             required: true
@@ -34,18 +33,15 @@ const cabSchema = new mongoose.Schema(
         // 🟢 Fields for "oneway"
         pickup: {
             type: String,
-            trim: true,
         },
         drop: {
             type: String,
-            trim: true,
         },
         date: {
             type: Date,
         },
         time: {
             type: String,
-            trim: true,
         },
 
         // 🟢 Fields for "roundtrip"
