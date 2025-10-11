@@ -15,7 +15,7 @@ const auth  = require("../middleware/auth");
 // Routes
 
 // Create a new inquiry (protected)
-router.post("/", auth, createInquiry);
+router.post("/", createInquiry);
 
 // Get all inquiries (protected)
 router.get("/", getInquiries);
@@ -24,7 +24,7 @@ router.get("/", getInquiries);
 router.get("/:id", getInquiryById);
 
 // Update an inquiry by ID (protected)
-router.put("/:id",auth, updateInquiry);
+router.put("/:id", updateInquiry);
 
 // Delete an inquiry by ID (protected)
 router.delete("/:id", deleteInquiry);

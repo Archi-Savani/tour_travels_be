@@ -13,10 +13,10 @@ const {
 const router = express.Router();
 
 // Single image upload
-router.post("/", auth, uploadSingleImage, uploadToCloudinary, createState);
+router.post("/", uploadSingleImage, uploadToCloudinary, createState);
 router.get("/", getStates);
 router.get("/:id", getStateById);
-router.put("/:id", auth, uploadSingleImage, uploadToCloudinary, updateState);
+router.put("/:id", uploadSingleImage, uploadToCloudinary, updateState);
 router.delete("/:id", auth, deleteState);
 
 module.exports = router;

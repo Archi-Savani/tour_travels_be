@@ -21,25 +21,16 @@ const createCab = async (req, res) => {
             time,
             seater,
             carName,
+            features,
+            pricePerKm,
         } = req.body;
 
-        // 🧠 Validate route type
         if (!routeType) {
             return res.status(400).json({
                 ok: false,
                 error: "routeType is required (oneway or roundtrip).",
             });
         }
-
-        // 🧠 For oneway, ensure required fields exist
-        // if (routeType === "oneway") {
-        //     if (!pickup || !drop || !date || !time) {
-        //         return res.status(400).json({
-        //             ok: false,
-        //             error: "Pickup, drop, date, and time are required for One Way routes.",
-        //         });
-        //     }
-        // }
 
         // 🧠 Upload image to Cloudinary
         let imageUrl = "";
@@ -52,18 +43,27 @@ const createCab = async (req, res) => {
             });
         }
 
-        // 🧠 Create Cab object
-        const cab = new Cab({
+        // 🧠 Build cab data
+        const cabData = {
             routeType,
-            pickup: routeType === "oneway" ? pickup : undefined,
-            drop: routeType === "oneway" ? drop : undefined,
-            date: routeType === "oneway" ? date : undefined,
-            time: routeType === "oneway" ? time : undefined,
             seater,
             carName,
             image: imageUrl,
-        });
+            features // ✅ Common now for all routes
+        };
 
+        if (routeType === "oneway") {
+            cabData.pickup = pickup;
+            cabData.drop = drop;
+            cabData.date = date;
+            cabData.time = time;
+        }
+
+        if (routeType === "roundtrip") {
+            cabData.pricePerKm = pricePerKm;
+        }
+
+        const cab = new Cab(cabData);
         await cab.save();
 
         res.status(201).json({
@@ -144,36 +144,38 @@ const updateCab = async (req, res) => {
             time,
             seater,
             carName,
+            features,
+            pricePerKm,
         } = req.body;
 
-        // 🧠 Update basic fields
         if (routeType) cab.routeType = routeType;
         if (seater) cab.seater = seater;
         if (carName) cab.carName = carName;
 
-        // 🧠 Handle image update
+        // ✅ Always update features now (common field)
+        if (features) {
+            cab.features = features;
+        }
+
+        // 🧠 Image update
         if (req.file) {
-            // Delete old image from Cloudinary
             if (cab.image) {
                 await deleteImageFromCloudinary(cab.image);
             }
-
-            // Upload new image
             const newImageUrl = await uploadFile(req.file.buffer, "cabs");
             cab.image = newImageUrl;
         }
 
-        // 🧠 Conditional field update for One Way
+        // 🧠 Handle conditional fields but DO NOT remove features for oneway
         if (cab.routeType === "oneway") {
             cab.pickup = pickup || cab.pickup;
             cab.drop = drop || cab.drop;
             cab.date = date || cab.date;
             cab.time = time || cab.time;
-        } else {
-            cab.pickup = undefined;
-            cab.drop = undefined;
-            cab.date = undefined;
-            cab.time = undefined;
+        }
+
+        if (cab.routeType === "roundtrip") {
+            cab.pricePerKm = pricePerKm ?? cab.pricePerKm;
         }
 
         await cab.save();
@@ -205,7 +207,6 @@ const deleteCab = async (req, res) => {
             });
         }
 
-        // Delete image from Cloudinary
         if (cab.image) {
             await deleteImageFromCloudinary(cab.image);
         }
