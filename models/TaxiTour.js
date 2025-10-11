@@ -54,13 +54,13 @@ const cabSchema = new mongoose.Schema(
 
 // ✅ Conditional validation middleware
 cabSchema.pre("validate", function (next) {
-    if (this.routeType === "oneway") {
-        if (!this.pickup || !this.drop || !this.date || !this.time) {
-            return next(
-                new Error("Pickup, drop, date, and time are required for One Way routes.")
-            );
-        }
-    }
+    // if (this.routeType === "oneway") {
+    //     if (!this.pickup || !this.drop || !this.date || !this.time) {
+    //         return next(
+    //             new Error("Pickup, drop, date, and time are required for One Way routes.")
+    //         );
+    //     }
+    // }
 
     if (this.routeType === "roundtrip") {
         if (this.pricePerKm == null) {
