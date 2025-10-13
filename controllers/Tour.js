@@ -1,5 +1,7 @@
 // controllers/tourController.js
 const Tour = require("../models/Tour");
+const State = require("../models/State");
+const City = require("../models/City");
 const { uploadToCloudinary } = require("../utils/upload");
 
 // helper to safely parse JSON
@@ -82,6 +84,7 @@ const createTour = async (req, res) => {
     try {
         const {
             state,
+            city,
             title,
             description,
             difficulty,
@@ -95,44 +98,53 @@ const createTour = async (req, res) => {
             summary,
             location,
             discount,
-            tourStar // ✅ Added here
+            tourStar
         } = req.body;
+
+        if (!state || !city) {
+            return res.status(400).json({ message: "State and City are required" });
+        }
+
+        // Validate state
+        const isStateExist = await State.findById(state);
+        if (!isStateExist) return res.status(404).json({ message: "State not found" });
+
+        // Validate city
+        const isCityExist = await City.findById(city);
+        if (!isCityExist) return res.status(404).json({ message: "City not found" });
 
         // collect files from multer.any()
         let imageUrls = [];
         const uploadedGalleryImages = {};
         if (Array.isArray(req.files)) {
-            const imageFiles = req.files.filter((f) => f.fieldname === "images");
-            const galleryFiles = req.files.filter((f) =>
-                /^gallery\[\d+\]\[image\]$/.test(f.fieldname)
-            );
+            const imageFiles = req.files.filter(f => f.fieldname === "images");
+            const galleryFiles = req.files.filter(f => /^gallery\[\d+\]\[image\]$/.test(f.fieldname));
             if (imageFiles.length) {
                 imageUrls = await Promise.all(
-                    imageFiles.map((file) => uploadToCloudinary(file.buffer))
+                    imageFiles.map(file => uploadToCloudinary(file.buffer))
                 );
             }
             for (const file of galleryFiles) {
-                uploadedGalleryImages[file.fieldname] = await uploadToCloudinary(
-                    file.buffer
-                );
+                uploadedGalleryImages[file.fieldname] = await uploadToCloudinary(file.buffer);
             }
         }
 
         const parsedFields = parseComplexFields(req.body, uploadedGalleryImages);
 
-        // discount calc
+        // discount calculation
         let discountedPrice = price;
         if (discount && discount > 0)
             discountedPrice = price - (price * discount) / 100;
 
-        // availableDates parse
+        // parse availableDates
         let parsedDates = [];
         if (parsedFields.availableDates) {
-            parsedDates = parsedFields.availableDates.map((d) => new Date(d));
+            parsedDates = parsedFields.availableDates.map(d => new Date(d));
         }
 
         const newTour = new Tour({
             state,
+            city,
             title,
             description,
             difficulty,
@@ -155,7 +167,7 @@ const createTour = async (req, res) => {
             gallery: parsedFields.gallery || [],
             discount,
             discountedPrice,
-            tourStar // ✅ Added to DB save
+            tourStar
         });
 
         const savedTour = await newTour.save();
@@ -168,24 +180,30 @@ const createTour = async (req, res) => {
 // UPDATE TOUR
 const updateTour = async (req, res) => {
     try {
-        const { discount, price, tourStar } = req.body; // ✅ Include here
+        const { discount, price, tourStar, state, city } = req.body;
+
+        // Validate state & city if provided
+        if (state) {
+            const isStateExist = await State.findById(state);
+            if (!isStateExist) return res.status(404).json({ message: "State not found" });
+        }
+        if (city) {
+            const isCityExist = await City.findById(city);
+            if (!isCityExist) return res.status(404).json({ message: "City not found" });
+        }
 
         let imageUrls = [];
         const uploadedGalleryImages = {};
         if (Array.isArray(req.files)) {
-            const imageFiles = req.files.filter((f) => f.fieldname === "images");
-            const galleryFiles = req.files.filter((f) =>
-                /^gallery\[\d+\]\[image\]$/.test(f.fieldname)
-            );
+            const imageFiles = req.files.filter(f => f.fieldname === "images");
+            const galleryFiles = req.files.filter(f => /^gallery\[\d+\]\[image\]$/.test(f.fieldname));
             if (imageFiles.length) {
                 imageUrls = await Promise.all(
-                    imageFiles.map((file) => uploadToCloudinary(file.buffer))
+                    imageFiles.map(file => uploadToCloudinary(file.buffer))
                 );
             }
             for (const file of galleryFiles) {
-                uploadedGalleryImages[file.fieldname] = await uploadToCloudinary(
-                    file.buffer
-                );
+                uploadedGalleryImages[file.fieldname] = await uploadToCloudinary(file.buffer);
             }
         }
 
@@ -199,23 +217,19 @@ const updateTour = async (req, res) => {
             ...req.body,
             discountedPrice,
             packages: parsedFields.packages || [],
-            availableDates: (parsedFields.availableDates || []).map((d) => new Date(d)),
+            availableDates: (parsedFields.availableDates || []).map(d => new Date(d)),
             schedule: parsedFields.schedule || [],
             recommended: parsedFields.recommended || [],
             trackActivity: parsedFields.trackActivity || [],
             gallery: parsedFields.gallery || [],
-            tourStar // ✅ Add to update object
+            tourStar
         };
 
         if (imageUrls.length > 0) updateData.images = imageUrls;
 
-        const updatedTour = await Tour.findByIdAndUpdate(
-            req.params.id,
-            updateData,
-            { new: true }
-        );
-        if (!updatedTour)
-            return res.status(404).json({ message: "Tour not found" });
+        const updatedTour = await Tour.findByIdAndUpdate(req.params.id, updateData, { new: true });
+        if (!updatedTour) return res.status(404).json({ message: "Tour not found" });
+
         res.status(200).json(updatedTour);
     } catch (err) {
         res.status(500).json({ message: "Error updating tour", error: err.message });
@@ -225,7 +239,7 @@ const updateTour = async (req, res) => {
 // GET TOURS
 const getTours = async (req, res) => {
     try {
-        const tours = await Tour.find().populate("state");
+        const tours = await Tour.find().populate("state").populate("city");
         res.status(200).json(tours);
     } catch (err) {
         res.status(500).json({ message: "Error fetching tours", error: err.message });
@@ -235,7 +249,7 @@ const getTours = async (req, res) => {
 // GET TOUR BY ID
 const getTourById = async (req, res) => {
     try {
-        const tour = await Tour.findById(req.params.id).populate("state");
+        const tour = await Tour.findById(req.params.id).populate("state").populate("city");
         if (!tour) return res.status(404).json({ message: "Tour not found" });
         res.status(200).json(tour);
     } catch (err) {
@@ -247,8 +261,7 @@ const getTourById = async (req, res) => {
 const deleteTour = async (req, res) => {
     try {
         const deletedTour = await Tour.findByIdAndDelete(req.params.id);
-        if (!deletedTour)
-            return res.status(404).json({ message: "Tour not found" });
+        if (!deletedTour) return res.status(404).json({ message: "Tour not found" });
         res.status(200).json({ message: "Tour deleted successfully" });
     } catch (err) {
         res.status(500).json({ message: "Error deleting tour", error: err.message });
@@ -259,28 +272,24 @@ const deleteTour = async (req, res) => {
 const getTourHighlights = async (req, res) => {
     try {
         const now = new Date();
-
-        // Upcoming tours (future only)
         const upcoming = await Tour.find({ availableDates: { $gte: now } })
             .populate("state")
+            .populate("city")
             .sort({ availableDates: 1, createdAt: -1 })
             .limit(10);
 
-        // Popular tours (high discount, not already in upcoming)
         const popular = await Tour.find({
             discount: { $gt: 0 },
-            availableDates: { $lt: now }, // only past or ongoing tours
+            availableDates: { $lt: now },
         })
             .populate("state")
+            .populate("city")
             .sort({ discount: -1, createdAt: -1 })
             .limit(10);
 
         res.status(200).json({ upcoming, popular });
     } catch (err) {
-        res.status(500).json({
-            message: "Error fetching tour highlights",
-            error: err.message,
-        });
+        res.status(500).json({ message: "Error fetching tour highlights", error: err.message });
     }
 };
 

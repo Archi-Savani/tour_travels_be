@@ -7,6 +7,11 @@ const tourSchema = new mongoose.Schema(
             ref: "State",
             required: true,
         },
+        city: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "City",
+            required: true,
+        },
         title: {
             type: String,
             required: true,
@@ -18,7 +23,6 @@ const tourSchema = new mongoose.Schema(
         },
         difficulty: {
             type: String,
-            required: true,
         },
         duration: {
             type: String, // e.g. "5 Days / 4 Nights"
