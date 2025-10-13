@@ -94,7 +94,8 @@ const createTour = async (req, res) => {
             price,
             summary,
             location,
-            discount
+            discount,
+            tourStar // ✅ Added here
         } = req.body;
 
         // collect files from multer.any()
@@ -153,7 +154,8 @@ const createTour = async (req, res) => {
             trackActivity: parsedFields.trackActivity || [],
             gallery: parsedFields.gallery || [],
             discount,
-            discountedPrice
+            discountedPrice,
+            tourStar // ✅ Added to DB save
         });
 
         const savedTour = await newTour.save();
@@ -166,7 +168,7 @@ const createTour = async (req, res) => {
 // UPDATE TOUR
 const updateTour = async (req, res) => {
     try {
-        const { discount, price } = req.body;
+        const { discount, price, tourStar } = req.body; // ✅ Include here
 
         let imageUrls = [];
         const uploadedGalleryImages = {};
@@ -201,7 +203,8 @@ const updateTour = async (req, res) => {
             schedule: parsedFields.schedule || [],
             recommended: parsedFields.recommended || [],
             trackActivity: parsedFields.trackActivity || [],
-            gallery: parsedFields.gallery || []
+            gallery: parsedFields.gallery || [],
+            tourStar // ✅ Add to update object
         };
 
         if (imageUrls.length > 0) updateData.images = imageUrls;

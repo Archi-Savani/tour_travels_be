@@ -12,6 +12,7 @@ const taxiTourRoutes = require("./routers/TaxiTour");
 const categoryRoutes = require("./routers/Category");
 const blogRoutes = require("./routers/Blog");
 const scheduleRoutes = require("./routers/schedule");
+const cityRoutes = require("./routers/City");
 
 dotenv.config();
 
@@ -38,6 +39,7 @@ app.use("/api/taxi-tour", taxiTourRoutes);
 app.use("/api/category", categoryRoutes);
 app.use("/api/blog", blogRoutes);
 app.use("/api/schedule", scheduleRoutes);
+app.use("/api/city", cityRoutes);
 
 const connectDB = async () => {
     try {

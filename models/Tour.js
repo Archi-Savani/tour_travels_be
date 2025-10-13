@@ -40,6 +40,12 @@ const tourSchema = new mongoose.Schema(
             type: String,
         },
 
+        // ⭐ NEW FIELD ADDED HERE
+        tourStar: {
+            type: Number, // like rating or star level
+            default: 0,   // default 0 stars if not set
+        },
+
         // ✅ packages now include sharingTypes
         packages: [
             {
@@ -55,10 +61,6 @@ const tourSchema = new mongoose.Schema(
                 ],
             },
         ],
-        // date: {
-        //     type: Date,
-        //     required: true, // makes the date mandatory
-        // },
 
         images: [
             {
