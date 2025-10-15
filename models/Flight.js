@@ -4,7 +4,7 @@ const flightSchema = new mongoose.Schema(
     {
         flightType: {
             type: String,
-            enum: ["oneway", "round trip"],
+            enum: ["oneway", "roundtrip"],
             required: true,
         },
         from: {
