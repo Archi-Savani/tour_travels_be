@@ -13,6 +13,7 @@ const categoryRoutes = require("./routers/Category");
 const blogRoutes = require("./routers/Blog");
 const scheduleRoutes = require("./routers/schedule");
 const cityRoutes = require("./routers/City");
+const flightRoutes = require("./routers/Flight");
 
 dotenv.config();
 
@@ -40,6 +41,7 @@ app.use("/api/category", categoryRoutes);
 app.use("/api/blog", blogRoutes);
 app.use("/api/schedule", scheduleRoutes);
 app.use("/api/city", cityRoutes);
+app.use("/api/flight", flightRoutes);
 
 const connectDB = async () => {
     try {
