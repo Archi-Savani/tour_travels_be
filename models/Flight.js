@@ -23,7 +23,7 @@ const flightSchema = new mongoose.Schema(
         },
         returnDate: {
             type: Date,
-            // required only if round trip
+            // required only if round trippp
         },
         adults: {
             type: Number,
