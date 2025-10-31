@@ -98,7 +98,8 @@ const createTour = async (req, res) => {
             summary,
             location,
             discount,
-            tourStar
+            tourStar,
+            tourType
         } = req.body;
 
         if (!state || !city) {
@@ -149,6 +150,7 @@ const createTour = async (req, res) => {
             description,
             difficulty,
             duration,
+            tourType,
             altitude,
             pickupPoints,
             baseCamp,

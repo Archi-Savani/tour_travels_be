@@ -43,8 +43,9 @@ const tourSchema = new mongoose.Schema(
         bestTimeToVisit: {
             type: String,
         },
-        tourtype: {
+        tourType: {
             type: String,
+            required: true,
             enum : ["Domestic" , "International"],
         },
 
