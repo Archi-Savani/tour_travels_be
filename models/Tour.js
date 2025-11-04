@@ -87,6 +87,7 @@ const tourSchema = new mongoose.Schema(
                 day: { type: Number },
                 title: { type: String },
                 desc: { type: String },
+                dayImage: { type: String },
             },
         ],
 

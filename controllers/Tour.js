@@ -13,8 +13,8 @@ const safeParse = (val) => {
     }
 };
 
-// Helper to parse JSON fields and gallery
-const parseComplexFields = (fields, uploadedGalleryImages) => {
+// Helper to parse JSON fields, gallery, and schedule with dayImage
+const parseComplexFields = (fields, uploadedGalleryImages, uploadedScheduleImages) => {
     const parsedFields = {};
     const jsonFields = [
         "packages",
@@ -76,6 +76,51 @@ const parseComplexFields = (fields, uploadedGalleryImages) => {
         return item;
     });
 
+    // Handle schedule parsing with possible dayImage uploads
+    const scheduleFromFields = [];
+    Object.keys(fields).forEach((key) => {
+        const match = key.match(/^schedule\[(\d+)\]\[(?:'|\")?(\w+)(?:'|\")?\]$/);
+        if (match) {
+            const idx = parseInt(match[1]);
+            const subField = match[2];
+            if (!scheduleFromFields[idx]) scheduleFromFields[idx] = {};
+
+            if (subField === "dayImage") {
+                if (typeof fields[key] === "string" && fields[key].startsWith("http")) {
+                    scheduleFromFields[idx][subField] = fields[key];
+                } else if (uploadedScheduleImages && uploadedScheduleImages[key]) {
+                    scheduleFromFields[idx][subField] = uploadedScheduleImages[key];
+                }
+            } else {
+                scheduleFromFields[idx][subField] = fields[key];
+            }
+        }
+    });
+
+    if (uploadedScheduleImages) {
+        Object.keys(uploadedScheduleImages).forEach((key) => {
+            const match = key.match(/^schedule\[(\d+)\]\[dayImage\]$/);
+            if (match) {
+                const idx = parseInt(match[1]);
+                if (!scheduleFromFields[idx]) scheduleFromFields[idx] = {};
+                scheduleFromFields[idx].dayImage = uploadedScheduleImages[key];
+            }
+        });
+    }
+
+    const normalizedSchedule = scheduleFromFields.filter(Boolean).map((item) => {
+        if (Array.isArray(item.dayImage)) item.dayImage = item.dayImage[0];
+        if (typeof item.day === "string") {
+            const n = Number(item.day);
+            if (!Number.isNaN(n)) item.day = n;
+        }
+        return item;
+    });
+
+    if (normalizedSchedule.length > 0) {
+        parsedFields.schedule = normalizedSchedule;
+    }
+
     return parsedFields;
 };
 
@@ -117,9 +162,11 @@ const createTour = async (req, res) => {
         // collect files from multer.any()
         let imageUrls = [];
         const uploadedGalleryImages = {};
+        const uploadedScheduleImages = {};
         if (Array.isArray(req.files)) {
             const imageFiles = req.files.filter(f => f.fieldname === "images");
             const galleryFiles = req.files.filter(f => /^gallery\[\d+\]\[image\]$/.test(f.fieldname));
+            const scheduleImageFiles = req.files.filter(f => /^schedule\[\d+\]\[dayImage\]$/.test(f.fieldname));
             if (imageFiles.length) {
                 imageUrls = await Promise.all(
                     imageFiles.map(file => uploadToCloudinary(file.buffer))
@@ -128,9 +175,12 @@ const createTour = async (req, res) => {
             for (const file of galleryFiles) {
                 uploadedGalleryImages[file.fieldname] = await uploadToCloudinary(file.buffer);
             }
+            for (const file of scheduleImageFiles) {
+                uploadedScheduleImages[file.fieldname] = await uploadToCloudinary(file.buffer);
+            }
         }
 
-        const parsedFields = parseComplexFields(req.body, uploadedGalleryImages);
+        const parsedFields = parseComplexFields(req.body, uploadedGalleryImages, uploadedScheduleImages);
 
         // discount calculation
         let discountedPrice = price;
@@ -196,9 +246,11 @@ const updateTour = async (req, res) => {
 
         let imageUrls = [];
         const uploadedGalleryImages = {};
+        const uploadedScheduleImages = {};
         if (Array.isArray(req.files)) {
             const imageFiles = req.files.filter(f => f.fieldname === "images");
             const galleryFiles = req.files.filter(f => /^gallery\[\d+\]\[image\]$/.test(f.fieldname));
+            const scheduleImageFiles = req.files.filter(f => /^schedule\[\d+\]\[dayImage\]$/.test(f.fieldname));
             if (imageFiles.length) {
                 imageUrls = await Promise.all(
                     imageFiles.map(file => uploadToCloudinary(file.buffer))
@@ -207,9 +259,12 @@ const updateTour = async (req, res) => {
             for (const file of galleryFiles) {
                 uploadedGalleryImages[file.fieldname] = await uploadToCloudinary(file.buffer);
             }
+            for (const file of scheduleImageFiles) {
+                uploadedScheduleImages[file.fieldname] = await uploadToCloudinary(file.buffer);
+            }
         }
 
-        const parsedFields = parseComplexFields(req.body, uploadedGalleryImages);
+        const parsedFields = parseComplexFields(req.body, uploadedGalleryImages, uploadedScheduleImages);
 
         let discountedPrice = price;
         if (discount && discount > 0)
