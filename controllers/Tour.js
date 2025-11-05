@@ -13,6 +13,42 @@ const safeParse = (val) => {
     }
 };
 
+// Normalize placesToBeVisited to an array of strings
+const normalizePlaces = (input) => {
+    if (input === undefined || input === null) return [];
+    let value = input;
+    if (typeof value === "string") {
+        // Try parse JSON string; fallback to single-item array
+        try {
+            const parsed = JSON.parse(value);
+            value = parsed;
+        } catch (_) {
+            return value.trim() ? [value] : [];
+        }
+    }
+    if (Array.isArray(value)) {
+        // Handle array where first item is a JSON array string
+        if (value.length === 1 && typeof value[0] === "string") {
+            const first = value[0];
+            if (first.trim().startsWith("[")) {
+                try {
+                    const parsed = JSON.parse(first);
+                    if (Array.isArray(parsed)) return parsed.map(String);
+                } catch (_) {
+                    // ignore
+                }
+            }
+        }
+        return value.map((v) => (v == null ? "" : String(v))).filter((s) => s !== "");
+    }
+    // Any other object type -> try to extract values
+    try {
+        return Object.values(value).map((v) => String(v)).filter((s) => s !== "");
+    } catch (_) {
+        return [];
+    }
+};
+
 // Helper to parse JSON fields, gallery, and schedule with dayImage
 const parseComplexFields = (fields, uploadedGalleryImages, uploadedScheduleImages) => {
     const parsedFields = {};
@@ -253,7 +289,7 @@ const createTour = async (req, res) => {
             price,
             schedule: parsedFields.schedule || [],
             summary,
-            placesToBeVisited: parsedFields.placesToBeVisited || [],
+            placesToBeVisited: normalizePlaces(parsedFields.placesToBeVisited ?? req.body.placesToBeVisited),
             recommended: parsedFields.recommended || [],
             location,
             trackActivity: parsedFields.trackActivity || [],
@@ -325,6 +361,12 @@ const updateTour = async (req, res) => {
 
         if (imageUrls.length > 0) updateData.images = imageUrls;
 
+        // normalize placesToBeVisited: always save as array of strings if provided
+        if (Object.prototype.hasOwnProperty.call(parsedFields, "placesToBeVisited") ||
+            Object.prototype.hasOwnProperty.call(req.body, "placesToBeVisited")) {
+            updateData.placesToBeVisited = normalizePlaces(parsedFields.placesToBeVisited ?? req.body.placesToBeVisited);
+        }
+
         const updatedTour = await Tour.findByIdAndUpdate(req.params.id, updateData, { new: true });
         if (!updatedTour) return res.status(404).json({ message: "Tour not found" });
 
@@ -338,7 +380,19 @@ const updateTour = async (req, res) => {
 const getTours = async (req, res) => {
     try {
         const tours = await Tour.find().populate("state").populate("city");
-        res.status(200).json(tours);
+        const normalized = tours.map((t) => {
+            const obj = t.toObject({ virtuals: true });
+            const v = t.placesToBeVisited;
+            if (Array.isArray(v)) {
+                obj.placesToBeVisited = v;
+            } else if (typeof v === "string") {
+                try { obj.placesToBeVisited = JSON.parse(v); } catch (_) { obj.placesToBeVisited = v ? [v] : []; }
+            } else {
+                obj.placesToBeVisited = [];
+            }
+            return obj;
+        });
+        res.status(200).json(normalized);
     } catch (err) {
         res.status(500).json({ message: "Error fetching tours", error: err.message });
     }
@@ -349,7 +403,16 @@ const getTourById = async (req, res) => {
     try {
         const tour = await Tour.findById(req.params.id).populate("state").populate("city");
         if (!tour) return res.status(404).json({ message: "Tour not found" });
-        res.status(200).json(tour);
+        const obj = tour.toObject({ virtuals: true });
+        const v = tour.placesToBeVisited;
+        if (Array.isArray(v)) {
+            obj.placesToBeVisited = v;
+        } else if (typeof v === "string") {
+            try { obj.placesToBeVisited = JSON.parse(v); } catch (_) { obj.placesToBeVisited = v ? [v] : []; }
+        } else {
+            obj.placesToBeVisited = [];
+        }
+        res.status(200).json(obj);
     } catch (err) {
         res.status(500).json({ message: "Error fetching tour", error: err.message });
     }
