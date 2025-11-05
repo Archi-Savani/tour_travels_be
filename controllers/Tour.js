@@ -58,7 +58,8 @@ const parseComplexFields = (fields, uploadedGalleryImages, uploadedScheduleImage
         "placesToBeVisited",
         "recommended",
         "trackActivity",
-        "availableDates"
+        "availableDates",
+        "gallery"
     ];
 
     jsonFields.forEach((field) => {
@@ -75,7 +76,7 @@ const parseComplexFields = (fields, uploadedGalleryImages, uploadedScheduleImage
         }));
     }
 
-    // Handle gallery parsing
+    // Handle gallery parsing (field-based)
     const gallery = [];
     Object.keys(fields).forEach((key) => {
         const match = key.match(/^gallery\[(\d+)\]\[(?:'|\")?(\w+)(?:'|\")?\]$/);
@@ -107,10 +108,41 @@ const parseComplexFields = (fields, uploadedGalleryImages, uploadedScheduleImage
         });
     }
 
-    parsedFields.gallery = gallery.filter(Boolean).map((item) => {
+    const galleryFromFields = gallery.filter(Boolean).map((item) => {
         if (Array.isArray(item.image)) item.image = item.image[0];
         return item;
     });
+
+    // If gallery was provided as JSON, merge with field-based and uploaded images
+    if (parsedFields.gallery && Array.isArray(parsedFields.gallery)) {
+        const merged = [];
+        const jsonGallery = parsedFields.gallery;
+        const maxLen = Math.max(jsonGallery.length, galleryFromFields.length);
+        for (let i = 0; i < maxLen; i++) {
+            merged[i] = {
+                ...(jsonGallery[i] || {}),
+                ...(galleryFromFields[i] || {}),
+            };
+        }
+        // Overlay uploaded images onto merged
+        if (uploadedGalleryImages) {
+            Object.keys(uploadedGalleryImages).forEach((key) => {
+                const match = key.match(/^gallery\[(\d+)\]\[image\]$/);
+                if (match) {
+                    const idx = parseInt(match[1]);
+                    if (!merged[idx]) merged[idx] = {};
+                    merged[idx].image = uploadedGalleryImages[key];
+                }
+            });
+        }
+        parsedFields.gallery = merged.filter(Boolean).map((item) => {
+            if (Array.isArray(item.image)) item.image = item.image[0];
+            return item;
+        });
+    } else {
+        // No JSON gallery provided; use field-based result
+        parsedFields.gallery = galleryFromFields;
+    }
 
     // Handle schedule parsing with day, title, desc, and dayImage
     const scheduleFromFields = [];
