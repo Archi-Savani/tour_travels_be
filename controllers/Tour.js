@@ -76,8 +76,22 @@ const parseComplexFields = (fields, uploadedGalleryImages, uploadedScheduleImage
         return item;
     });
 
-    // Handle schedule parsing with possible dayImage uploads
+    // Handle schedule parsing with day, title, desc, and dayImage
     const scheduleFromFields = [];
+    
+    // First, check if schedule is sent as JSON string
+    if (parsedFields.schedule && Array.isArray(parsedFields.schedule)) {
+        parsedFields.schedule.forEach((item, idx) => {
+            if (!scheduleFromFields[idx]) scheduleFromFields[idx] = {};
+            // Copy all fields from JSON schedule (day, title, desc, dayImage)
+            if (item.day !== undefined) scheduleFromFields[idx].day = item.day;
+            if (item.title !== undefined) scheduleFromFields[idx].title = item.title;
+            if (item.desc !== undefined) scheduleFromFields[idx].desc = item.desc;
+            if (item.dayImage !== undefined) scheduleFromFields[idx].dayImage = item.dayImage;
+        });
+    }
+    
+    // Then parse individual field-based inputs (like schedule[0][day], schedule[0][title], etc.)
     Object.keys(fields).forEach((key) => {
         const match = key.match(/^schedule\[(\d+)\]\[(?:'|\")?(\w+)(?:'|\")?\]$/);
         if (match) {
@@ -85,18 +99,24 @@ const parseComplexFields = (fields, uploadedGalleryImages, uploadedScheduleImage
             const subField = match[2];
             if (!scheduleFromFields[idx]) scheduleFromFields[idx] = {};
 
+            // Handle dayImage separately (can be uploaded file or URL)
             if (subField === "dayImage") {
                 if (typeof fields[key] === "string" && fields[key].startsWith("http")) {
                     scheduleFromFields[idx][subField] = fields[key];
                 } else if (uploadedScheduleImages && uploadedScheduleImages[key]) {
                     scheduleFromFields[idx][subField] = uploadedScheduleImages[key];
+                } else if (fields[key]) {
+                    scheduleFromFields[idx][subField] = fields[key];
                 }
-            } else {
+            } 
+            // Handle day, title, desc fields - capture all of them
+            else if (subField === "day" || subField === "title" || subField === "desc") {
                 scheduleFromFields[idx][subField] = fields[key];
             }
         }
     });
 
+    // Handle uploaded schedule images (overrides any existing dayImage)
     if (uploadedScheduleImages) {
         Object.keys(uploadedScheduleImages).forEach((key) => {
             const match = key.match(/^schedule\[(\d+)\]\[dayImage\]$/);
@@ -108,13 +128,34 @@ const parseComplexFields = (fields, uploadedGalleryImages, uploadedScheduleImage
         });
     }
 
+    // Normalize schedule: ensure day is number, dayImage is single value, and preserve title, desc
     const normalizedSchedule = scheduleFromFields.filter(Boolean).map((item) => {
-        if (Array.isArray(item.dayImage)) item.dayImage = item.dayImage[0];
-        if (typeof item.day === "string") {
-            const n = Number(item.day);
-            if (!Number.isNaN(n)) item.day = n;
+        const normalized = {};
+        
+        // Normalize day to number
+        if (item.day !== undefined && item.day !== null && item.day !== "") {
+            if (typeof item.day === "string") {
+                const n = Number(item.day);
+                normalized.day = !Number.isNaN(n) ? n : item.day;
+            } else {
+                normalized.day = item.day;
+            }
         }
-        return item;
+        
+        // Preserve title and desc (only if they have values)
+        if (item.title !== undefined && item.title !== null && item.title !== "") {
+            normalized.title = item.title;
+        }
+        if (item.desc !== undefined && item.desc !== null && item.desc !== "") {
+            normalized.desc = item.desc;
+        }
+        
+        // Normalize dayImage (ensure it's a single string, not array)
+        if (item.dayImage !== undefined && item.dayImage !== null && item.dayImage !== "") {
+            normalized.dayImage = Array.isArray(item.dayImage) ? item.dayImage[0] : item.dayImage;
+        }
+        
+        return normalized;
     });
 
     if (normalizedSchedule.length > 0) {
