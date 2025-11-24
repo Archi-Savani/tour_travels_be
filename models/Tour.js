@@ -126,13 +126,9 @@ const tourSchema = new mongoose.Schema(
             },
         ],
 
-        discount: {
-            type: Number, // percentage or flat discount
-            default: 0,
-        },
-
         discountedPrice: {
             type: Number,
+            required: true,
         },
     },
     { timestamps: true }

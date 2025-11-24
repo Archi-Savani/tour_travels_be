@@ -249,9 +249,9 @@ const createTour = async (req, res) => {
             minimumAge,
             bestTimeToVisit,
             price,
+            discountedPrice,
             summary,
             location,
-            discount,
             tourStar,
             tourType
         } = req.body;
@@ -291,16 +291,15 @@ const createTour = async (req, res) => {
 
         const parsedFields = parseComplexFields(req.body, uploadedGalleryImages, uploadedScheduleImages);
 
-        // discount calculation
-        let discountedPrice = price;
-        if (discount && discount > 0)
-            discountedPrice = price - (price * discount) / 100;
-
         // parse availableDates
         let parsedDates = [];
         if (parsedFields.availableDates) {
             parsedDates = parsedFields.availableDates.map(d => new Date(d));
         }
+
+        const finalDiscountedPrice = discountedPrice !== undefined && discountedPrice !== null
+            ? discountedPrice
+            : price;
 
         const newTour = new Tour({
             state,
@@ -326,8 +325,7 @@ const createTour = async (req, res) => {
             location,
             trackActivity: parsedFields.trackActivity || [],
             gallery: parsedFields.gallery || [],
-            discount,
-            discountedPrice,
+            discountedPrice: finalDiscountedPrice,
             tourStar
         });
 
@@ -341,7 +339,7 @@ const createTour = async (req, res) => {
 // UPDATE TOUR
 const updateTour = async (req, res) => {
     try {
-        const { discount, price, tourStar, state, city } = req.body;
+        const { price, discountedPrice, tourStar, state, city } = req.body;
 
         // Validate state & city if provided
         if (state) {
@@ -375,13 +373,8 @@ const updateTour = async (req, res) => {
 
         const parsedFields = parseComplexFields(req.body, uploadedGalleryImages, uploadedScheduleImages);
 
-        let discountedPrice = price;
-        if (discount && discount > 0)
-            discountedPrice = price - (price * discount) / 100;
-
         const updateData = {
             ...req.body,
-            discountedPrice,
             packages: parsedFields.packages || [],
             availableDates: (parsedFields.availableDates || []).map(d => new Date(d)),
             schedule: parsedFields.schedule || [],
@@ -390,6 +383,16 @@ const updateTour = async (req, res) => {
             gallery: parsedFields.gallery || [],
             tourStar
         };
+
+        const resolvedDiscountedPrice = Object.prototype.hasOwnProperty.call(req.body, "discountedPrice")
+            ? discountedPrice
+            : (Object.prototype.hasOwnProperty.call(req.body, "price") ? price : undefined);
+
+        if (resolvedDiscountedPrice !== undefined) {
+            updateData.discountedPrice = resolvedDiscountedPrice;
+        } else {
+            delete updateData.discountedPrice;
+        }
 
         if (imageUrls.length > 0) updateData.images = imageUrls;
 
@@ -472,12 +475,12 @@ const getTourHighlights = async (req, res) => {
             .limit(10);
 
         const popular = await Tour.find({
-            discount: { $gt: 0 },
             availableDates: { $lt: now },
+            $expr: { $lt: ["$discountedPrice", "$price"] }
         })
             .populate("state")
             .populate("city")
-            .sort({ discount: -1, createdAt: -1 })
+            .sort({ discountedPrice: 1, createdAt: -1 })
             .limit(10);
 
         res.status(200).json({ upcoming, popular });
