@@ -1,8 +1,20 @@
 // controllers/Blog.js
+const mongoose = require("mongoose");
 const Blog = require("../models/Blog");
 const Category = require("../models/Category");
 const User = require("../models/User");
 const { uploadBlogImage, deleteImageFromCloudinary } = require("../utils/upload");
+
+const createSlug = (value = "") => {
+    const normalized = value
+        .toString()
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "")
+        .replace(/-{2,}/g, "-");
+    return normalized || `blog-${Date.now()}`;
+};
 
 // ------------------------
 // Create Blog
@@ -14,7 +26,7 @@ const createBlog = async (req, res) => {
         console.log("Request file:", req.file);
 
         // Get data from form-data
-        const { title, content, readTime, category } = req.body;
+        const { title, content, readTime, category, slug } = req.body;
         
         // Get image URL from uploaded file or from body (if URL provided)
         let blogImage;
@@ -59,12 +71,22 @@ const createBlog = async (req, res) => {
             });
         }
 
+        const normalizedSlug = createSlug(slug || title);
+        const slugExists = await Blog.findOne({ slug: normalizedSlug });
+        if (slugExists) {
+            return res.status(409).json({
+                success: false,
+                message: "Slug already in use. Please provide a unique slug."
+            });
+        }
+
         const blog = new Blog({
             title,
             content,
             blogImage,
             readTime,
-            category
+            category,
+            slug: normalizedSlug
         });
 
         await blog.save();
@@ -148,8 +170,16 @@ const getBlogs = async (req, res) => {
 // ------------------------
 const getBlogById = async (req, res) => {
     try {
-        const blog = await Blog.findById(req.params.id)
-            .populate('category', 'title');
+        const identifier = req.params.id;
+        let blog = null;
+
+        if (mongoose.Types.ObjectId.isValid(identifier)) {
+            blog = await Blog.findById(identifier).populate("category", "title");
+        }
+
+        if (!blog) {
+            blog = await Blog.findOne({ slug: identifier }).populate("category", "title");
+        }
 
         if (!blog) {
             return res.status(404).json({ 
@@ -172,12 +202,41 @@ const getBlogById = async (req, res) => {
 };
 
 // ------------------------
+// Get Blog by Slug
+// ------------------------
+const getBlogBySlug = async (req, res) => {
+    try {
+        const blog = await Blog.findOne({ slug: req.params.slug })
+            .populate('category', 'title');
+
+        if (!blog) {
+            return res.status(404).json({ 
+                success: false, 
+                message: "Blog not found" 
+            });
+        }
+
+        res.status(200).json({ 
+            success: true, 
+            data: blog 
+        });
+    } catch (error) {
+        res.status(500).json({ 
+            success: false, 
+            message: "Error fetching blog by slug", 
+            error: error.message 
+        });
+    }
+};
+
+
+// ------------------------
 // Update Blog
 // ------------------------
 const updateBlog = async (req, res) => {
     try {
         // Get data from form-data
-        const { title, content, readTime, category } = req.body;
+        const { title, content, readTime, category, slug } = req.body;
         
         // Get image URL from uploaded file or from body (if URL provided)
         let blogImage;
@@ -214,6 +273,24 @@ const updateBlog = async (req, res) => {
         if (blogImage) updateData.blogImage = blogImage;
         if (readTime) updateData.readTime = readTime;
         if (category) updateData.category = category;
+
+        if (slug) {
+            const normalizedSlug = createSlug(slug);
+            const slugExists = await Blog.findOne({ 
+                slug: normalizedSlug,
+                _id: { $ne: req.params.id }
+            });
+
+            if (slugExists) {
+                return res.status(409).json({
+                    success: false,
+                    message: "Slug already in use. Please provide a unique slug."
+                });
+            }
+            updateData.slug = normalizedSlug;
+        } else if (title && !slug) {
+            // If title is updated but slug is not provided, keep existing slug.
+        }
 
         const blog = await Blog.findByIdAndUpdate(
             req.params.id,
@@ -328,6 +405,7 @@ module.exports = {
     createBlog,
     getBlogs,
     getBlogById,
+    getBlogBySlug,
     updateBlog,
     deleteBlog,
     getBlogsByCategory

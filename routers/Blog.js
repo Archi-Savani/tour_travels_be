@@ -7,6 +7,7 @@ const {
     createBlog,
     getBlogs,
     getBlogById,
+    getBlogBySlug,
     updateBlog,
     deleteBlog,
     getBlogsByCategory
@@ -20,6 +21,9 @@ router.get("/", getBlogs);
 
 // Get blogs by category
 router.get("/category/:categoryId", getBlogsByCategory);
+
+// Get blog by slug
+router.get("/slug/:slug", getBlogBySlug);
 
 // Get blog by ID
 router.get("/:id", getBlogById);

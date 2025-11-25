@@ -9,6 +9,14 @@ const blogSchema = new mongoose.Schema(
             trim: true,
             maxlength: 200
         },
+        slug: {
+            type: String,
+            required: [true, "Slug is required"],
+            trim: true,
+            unique: true,
+            lowercase: true,
+            maxlength: 220
+        },
         content: {
             type: String,
             required: [true, "Content is required"],
@@ -38,5 +46,6 @@ const blogSchema = new mongoose.Schema(
 blogSchema.index({ title: "text", content: "text" });
 blogSchema.index({ category: 1 });
 blogSchema.index({ createdAt: -1 });
+blogSchema.index({ slug: 1 }, { unique: true });
 
 module.exports = mongoose.model("Blog", blogSchema);
