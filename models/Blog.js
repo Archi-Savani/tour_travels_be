@@ -37,7 +37,19 @@ const blogSchema = new mongoose.Schema(
             type: mongoose.Schema.Types.ObjectId,
             ref: "Category",
             required: [true, "Category is required"]
-        }
+        },
+        metaTitle: {
+            type: String,
+            required: [true, "Title is required"],
+            trim: true,
+            maxlength: 200
+        },
+        metaDescription: {
+            type: String,
+            required: [true, "Title is required"],
+            trim: true,
+            maxlength: 200
+        },
     },
     { timestamps: true } // adds createdAt and updatedAt
 );
