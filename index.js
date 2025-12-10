@@ -15,6 +15,7 @@ const scheduleRoutes = require("./routers/schedule");
 const cityRoutes = require("./routers/City");
 const flightRoutes = require("./routers/Flight");
 const corporateRoutes = require("./routers/Corporate");
+const countryRoutes = require("./routers/Country");
 
 dotenv.config();
 
@@ -44,6 +45,7 @@ app.use("/api/schedule", scheduleRoutes);
 app.use("/api/city", cityRoutes);
 app.use("/api/flight", flightRoutes);
 app.use("/api/corporate",corporateRoutes );
+app.use("/api/country", countryRoutes);
 
 const connectDB = async () => {
     try {
