@@ -1,17 +1,29 @@
 const State = require("../models/State");
+const Country = require("../models/Country");
 const { uploadFile } = require("../utils/upload"); // adjust path if needed
 
 // @desc Create a new State
 // @route POST /api/states
 exports.createState = async (req, res) => {
     try {
-        const { name, description } = req.body;
+        const { country, name, description } = req.body;
+
+        if (!country) {
+            return res.status(400).json({ message: "Country is required" });
+        }
+
+        // Validate country exists
+        const isCountryExist = await Country.findById(country);
+        if (!isCountryExist) {
+            return res.status(404).json({ message: "Country not found" });
+        }
 
         if (!req.imageUrl) {
             return res.status(400).json({ message: "Image file is required" });
         }
 
         const state = new State({
+            country,
             name,
             description,
             image: req.imageUrl
@@ -33,7 +45,7 @@ exports.createState = async (req, res) => {
 // @route GET /api/states
 exports.getStates = async (req, res) => {
     try {
-        const states = await State.find().sort({ createdAt: -1 });
+        const states = await State.find().populate("country").sort({ createdAt: -1 });
         res.status(200).json(states);
     } catch (err) {
         console.error(err);
@@ -45,7 +57,7 @@ exports.getStates = async (req, res) => {
 // @route GET /api/states/:id
 exports.getStateById = async (req, res) => {
     try {
-        const state = await State.findById(req.params.id);
+        const state = await State.findById(req.params.id).populate("country");
         if (!state) {
             return res.status(404).json({ message: "State not found" });
         }
@@ -60,8 +72,17 @@ exports.getStateById = async (req, res) => {
 // @route PUT /api/states/:id
 exports.updateState = async (req, res) => {
     try {
-        const { name, description } = req.body;
+        const { country, name, description } = req.body;
         let updateData = { name, description };
+
+        // Validate country if provided
+        if (country) {
+            const isCountryExist = await Country.findById(country);
+            if (!isCountryExist) {
+                return res.status(404).json({ message: "Country not found" });
+            }
+            updateData.country = country;
+        }
 
         // if a new image is uploaded
         if (req.imageUrl) {
@@ -71,7 +92,7 @@ exports.updateState = async (req, res) => {
         const state = await State.findByIdAndUpdate(req.params.id, updateData, {
             new: true,
             runValidators: true
-        });
+        }).populate("country");
 
         if (!state) {
             return res.status(404).json({ message: "State not found" });
