@@ -26,7 +26,7 @@ const createBlog = async (req, res) => {
         console.log("Request file:", req.file);
 
         // Get data from form-data
-        const { title, content, readTime, category, slug } = req.body;
+        const { title, content, readTime, category, slug,metaTitle,metaDescription } = req.body;
         
         // Get image URL from uploaded file or from body (if URL provided)
         let blogImage;
@@ -86,7 +86,9 @@ const createBlog = async (req, res) => {
             blogImage,
             readTime,
             category,
-            slug: normalizedSlug
+            slug: normalizedSlug,
+            metaTitle,
+            metaDescription,
         });
 
         await blog.save();
