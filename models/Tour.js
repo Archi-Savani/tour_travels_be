@@ -2,6 +2,11 @@ const mongoose = require("mongoose");
 
 const tourSchema = new mongoose.Schema(
     {
+        country: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "Country",
+            required: true,
+        },
         state: {
             type: mongoose.Schema.Types.ObjectId,
             ref: "State",

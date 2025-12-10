@@ -1,5 +1,6 @@
 // controllers/tourController.js
 const Tour = require("../models/Tour");
+const Country = require("../models/Country");
 const State = require("../models/State");
 const City = require("../models/City");
 const { uploadToCloudinary } = require("../utils/upload");
@@ -237,6 +238,7 @@ const parseComplexFields = (fields, uploadedGalleryImages, uploadedScheduleImage
 const createTour = async (req, res) => {
     try {
         const {
+            country,
             state,
             city,
             title,
@@ -256,9 +258,13 @@ const createTour = async (req, res) => {
             tourType
         } = req.body;
 
-        if (!state || !city) {
-            return res.status(400).json({ message: "State and City are required" });
+        if (!country || !state || !city) {
+            return res.status(400).json({ message: "Country, State and City are required" });
         }
+
+        // Validate country
+        const isCountryExist = await Country.findById(country);
+        if (!isCountryExist) return res.status(404).json({ message: "Country not found" });
 
         // Validate state
         const isStateExist = await State.findById(state);
@@ -302,6 +308,7 @@ const createTour = async (req, res) => {
             : price;
 
         const newTour = new Tour({
+            country,
             state,
             city,
             title,
@@ -339,9 +346,13 @@ const createTour = async (req, res) => {
 // UPDATE TOUR
 const updateTour = async (req, res) => {
     try {
-        const { price, discountedPrice, tourStar, state, city } = req.body;
+        const { price, discountedPrice, tourStar, country, state, city } = req.body;
 
-        // Validate state & city if provided
+        // Validate country, state & city if provided
+        if (country) {
+            const isCountryExist = await Country.findById(country);
+            if (!isCountryExist) return res.status(404).json({ message: "Country not found" });
+        }
         if (state) {
             const isStateExist = await State.findById(state);
             if (!isStateExist) return res.status(404).json({ message: "State not found" });
@@ -414,7 +425,7 @@ const updateTour = async (req, res) => {
 // GET TOURS
 const getTours = async (req, res) => {
     try {
-        const tours = await Tour.find().populate("state").populate("city");
+        const tours = await Tour.find().populate("country").populate("state").populate("city");
         const normalized = tours.map((t) => {
             const obj = t.toObject({ virtuals: true });
             const v = t.placesToBeVisited;
@@ -436,7 +447,7 @@ const getTours = async (req, res) => {
 // GET TOUR BY ID
 const getTourById = async (req, res) => {
     try {
-        const tour = await Tour.findById(req.params.id).populate("state").populate("city");
+        const tour = await Tour.findById(req.params.id).populate("country").populate("state").populate("city");
         if (!tour) return res.status(404).json({ message: "Tour not found" });
         const obj = tour.toObject({ virtuals: true });
         const v = tour.placesToBeVisited;
@@ -469,6 +480,7 @@ const getTourHighlights = async (req, res) => {
     try {
         const now = new Date();
         const upcoming = await Tour.find({ availableDates: { $gte: now } })
+            .populate("country")
             .populate("state")
             .populate("city")
             .sort({ availableDates: 1, createdAt: -1 })
@@ -478,6 +490,7 @@ const getTourHighlights = async (req, res) => {
             availableDates: { $lt: now },
             $expr: { $lt: ["$discountedPrice", "$price"] }
         })
+            .populate("country")
             .populate("state")
             .populate("city")
             .sort({ discountedPrice: 1, createdAt: -1 })
